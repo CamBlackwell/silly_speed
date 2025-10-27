@@ -11,11 +11,35 @@ class AudioManager: NSObject, ObservableObject {
 
     private var audioPlayer = AVAudioPlayer
     private var timer: Timer?
-    private let documentsDirectory: URL
+    private let fileDirectory: URL
     private let audioFilesKey = "savedAudioFiles"
 
+    override init() {
+        self.fileDirectory = FileManager.default.urls(for: .fileDirectory, in: .userDomainMask)
+        super.init()
+        loadAudioFiles()
+        setupAudioSession()
+        
+    }
+}
 
 
 
+private func setupAudioSession(){
 
 }
+
+private func loadAudioFiles(){
+
+}
+
+
+
+func play(){
+
+}
+
+func pause(){
+
+}
+
