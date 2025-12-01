@@ -26,10 +26,38 @@ class AudioManager: NSObject, ObservableObject {
 
 
 private func setupAudioSession(){
-
+    do {
+        let audioSession = AVAudioSession.sharedInstance()
+        try audioSession.setCategory(.playback, mode: .default)
+        try audioSession.setActive(true)
+    } catch {
+        print("failed to set up audio \(error.localizedDescription)")
+    }
 }
 
-private func loadAudioFiles(){
+private func importAudioFiles(from url: URL){
+    guard url.startAccessingSecurityScopedResource() else {
+        print("failed to accesss file")
+        return
+    }
+    defer {url.stopAccessingSecurityScopedResource()}
+
+    let fileName = url.lastPathComponent
+    let destinationURL = documentsDirectory.appendingPathComponent(fileName)
+
+    do {
+        if FileManager.default.fileExists(atPath: destinationURL.path){
+            try FileManager.default.removeItem(at: destinationURL)
+        }
+        try FileManager.default.copyItem(at: url, to: destinationURL)
+
+        let audioFile = AudioFile(fileName: fileName, fileURL: destinationURL)
+        audioFiles.append(audioFile)
+
+        saveAudioFiles()
+    } catch {
+        print("failed to import file \(error.localizedDescription)")
+    }
 
 }
 
