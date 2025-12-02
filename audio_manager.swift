@@ -97,11 +97,24 @@ private func loadAudioFiles(){
 
 
 
-func play(){
+func play(audioFile: AudioFile){
+    do {
+        audioPlayer = try AVAudioPlayer(contentsOf: AudioFile.fileURL)
+        audioPlayer?.delegate = self
+        audioPlayer?.prepareToPlay()
+        audioPlayer?.play()
 
+        isPlaying = true
+        currentPlayingID = audioPlayer.id
+        duration = audioPlayer?.duration ?? 0
+        startTimer()
+    } catch {
+        print("failed to play audio \(error.localizedDescription)")
+    }
 }
 
 func pause(){
 
 }
 
+private func 
