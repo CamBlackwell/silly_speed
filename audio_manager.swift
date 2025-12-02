@@ -7,7 +7,7 @@ class AudioManager: NSObject, ObservableObject {
     @Public var isPlaying: Bool = false
     @public var currentTime: TimeInterval = 0
     @public var duration: TimeInterval = 0
-    @public var currentPlayingUUID = UUID?
+    @public var currentPlayingID = UUID?
 
     private var audioPlayer = AVAudioPlayer
     private var timer: Timer?
@@ -57,6 +57,40 @@ private func importAudioFiles(from url: URL){
         saveAudioFiles()
     } catch {
         print("failed to import file \(error.localizedDescription)")
+    }
+
+}
+
+private func deleteAudioFiles(_ audioFile: AudioFile){
+    if currentPlayingID == audioFile.id {
+        stop()
+    }
+    do {
+        try FileManager.default.removeItem(at: audioFile.fileURL)
+    } catch {
+        print("failed to delete file \(error.localizedDescription)")
+    }
+    audioFiles.removeAll{$0.id == audioFile.id}
+    saveAudioFiles()
+}
+
+private func saveAudioFiles(){
+    do {
+        let data = try JSONEncoder().encode(audioFiles)
+        UserDefaults.standard.set(data, forKey: audioFilesKey)
+    } catch {
+        print("failed to save audio files \(error.localizedDescription)")
+    }
+}
+
+private func loadAudioFiles(){
+    guard let data = UserDefaults.standard.data(forKey: audioFilesKey) else { return }
+
+    do {
+        let loadedFiles = try JSONDecoder().decode([AudioFile].self, from: data)
+        audioFiles = loadedFiles.filter{FileManager.default.fileExists(atPath: $0.fileURL.path)}
+    } catch {
+        print("failed to load Audio Files \(error.localizedDescription)")
     }
 
 }
