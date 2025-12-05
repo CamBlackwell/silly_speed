@@ -2,8 +2,8 @@ import SwiftUI
 import UniformTypeIdentifiers 
 
 struct ContentView: View {
-    @stateObject private var audioManager = AudioManager()
-    @state private var showingFilePicker = false
+    @StateObject private var audioManager = AudioManager()
+    @State private var showingFilePicker = false
 
     var body: some View {
         NavigationStack{
@@ -25,8 +25,8 @@ struct ContentView: View {
                 } else {
                     List{
                         ForEach(audioManager.audioFiles) {audioFile in
-                            NavigationLink(definition: AudioPlayerView(audioFile: audioFile, audioManager: audioManager)){ //FIX THIS LATER ITS NOT WHAT I WANT IT TO DO!!!!!
-                                AudioFileRow(audioFile: audioFile, isCurrentlyPlaying: audioManager.isCurrentlyPlayingID == audioFile.id)
+                            NavigationLink(destination: AudioPlayerView(audioFile: audioFile, audioManager: audioManager)){ //FIX THIS LATER ITS NOT WHAT I WANT IT TO DO!!!!!
+                                AudioFileRow(audioFile: audioFile, isCurrentlyPlaying: audioManager.currentlyPlayingID == audioFile.id)
                             }
                         .contextMenu{ //hold down functionality
                             Button("share this file", systemImage: "square.and.arrow.up") {} //TODO
@@ -37,8 +37,8 @@ struct ContentView: View {
                             
                             Button(role: .destructive){
                                 //delete(AudioFile)
-                                } Label: {
-                                    Label("Delete via Menu", systemImage: "trash").foregroundStyle(.red)
+                                } label: {
+                                    Label("Delete via Menu", systemImage: "trash")
                                 }
                             }
                         }
@@ -61,8 +61,8 @@ struct ContentView: View {
     }
     private func deleteFiles(at offsets: IndexSet){
         for index in offsets {
-            audioFile = audioManager.audioFiles[index]
-            audioManager.deteleAudioFile(audioFile)
+            let audioFile = audioManager.audioFiles[index]
+            audioManager.deleteAudioFile(audioFile)
         }
     }
 }
@@ -73,11 +73,11 @@ struct AudioFileRow: View {
 
     var body: some View {
         HStack {
-            Image(systemName: isCurrentlyPlaying ?  "mood" : "sentiment_satisfied")
+            Image(systemName: isCurrentlyPlaying ?  "face.smiling.fill" : "face.smiling")
             .foregroundStyle(isCurrentlyPlaying ? .blue : .gray)
             .font(.title2)
 
-            VStack(allignment: .leading, Spacing: 4){
+            VStack(alignment: .leading, spacing: 4){
                 Text(audioFile.fileName)
                     .font(.headline)
 
@@ -96,3 +96,40 @@ struct AudioFileRow: View {
     }
 }
 
+struct DocumentPicker: UIViewControllerRepresentable{
+    let audioManager: AudioManager
+    @Environment(\.dismiss) var dismiss
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController{
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audio])
+        picker.allowsMultipleSelection = true 
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let parent: DocumentPicker
+
+        init(_ parent: DocumentPicker){
+            self.parent = parent
+        }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]){
+            for url in urls {
+                parent.audioManager.importAudioFile(from: url)
+            }
+            parent.dismiss()
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController){
+            parent.dismiss()
+        }
+
+    }
+}
