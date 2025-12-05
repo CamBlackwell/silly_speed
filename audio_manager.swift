@@ -7,7 +7,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
-    @Published var currentPlayingID: UUID?
+    @Published var currentlyPlayingID: UUID?
 
     private var audioPlayer: AVAudioPlayer?
     private var timer: Timer?
@@ -43,7 +43,7 @@ class AudioManager: NSObject, ObservableObject {
         let destinationURL = fileDirectory.appendingPathComponent(fileName)
 
         do {
-            if FileManager.default.fileExists(atPath: destinationURL.path){
+            if FileManager.default.fileExists(atPath: destinationURL.path()){
                 try FileManager.default.removeItem(at: destinationURL)
             }
             try FileManager.default.copyItem(at: url, to: destinationURL)
@@ -58,8 +58,8 @@ class AudioManager: NSObject, ObservableObject {
 
     }
 
-    func deleteAudioFiles(_ audioFile: AudioFile){
-        if currentPlayingID == audioFile.id {
+    func deleteAudioFile(_ audioFile: AudioFile){
+        if currentlyPlayingID == audioFile.id {
             stop()
         }
         do {
@@ -85,7 +85,7 @@ class AudioManager: NSObject, ObservableObject {
 
         do {
             let loadedFiles = try JSONDecoder().decode([AudioFile].self, from: data)
-            audioFiles = loadedFiles.filter{FileManager.default.fileExists(atPath: $0.fileURL.path)}
+            audioFiles = loadedFiles.filter{FileManager.default.fileExists(atPath: $0.fileURL.path())}
         } catch {
             print("failed to load Audio Files \(error.localizedDescription)")
         }
@@ -102,7 +102,7 @@ class AudioManager: NSObject, ObservableObject {
             audioPlayer?.play()
 
             isPlaying = true
-            currentPlayingID = audioFile.id
+            currentlyPlayingID = audioFile.id
             duration = audioPlayer?.duration ?? 0
             startTimer()
         } catch {
@@ -157,7 +157,7 @@ class AudioManager: NSObject, ObservableObject {
 extension AudioManager: AVAudioPlayerDelegate{
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool){
         isPlaying = false
-        currentPlayingID = nil
+        currentlyPlayingID = nil
         currentTime = 0
         stopTimer()
     }

@@ -36,7 +36,7 @@ struct ContentView: View {
                             //rename(AudioFile)
                             
                             Button(role: .destructive){
-                                //delete(AudioFile)
+                                audioManager.deleteAudioFile(audioFile)
                                 } label: {
                                     Label("Delete via Menu", systemImage: "trash")
                                 }
