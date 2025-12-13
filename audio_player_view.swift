@@ -103,8 +103,8 @@ struct AudioPlayerView: View {
                         .foregroundColor(.secondary)
                     
                     Slider(value: $volume, in: 0...1)
-                        .onChange(of: volume) { newValue in
-                            audioManager.setVolume(newValue)
+                        .onChange(of: volume) {
+                            audioManager.setVolume(volume)
                         }
                     
                     Image(systemName: "speaker.wave.3.fill")

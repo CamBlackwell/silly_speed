@@ -115,7 +115,7 @@ class AudioManager: NSObject, ObservableObject {
         audioPlayer = nil
         isPlaying = false
         currentTime = 0
-        currentPlayingID = nil
+        currentlyPlayingID = nil
         stopTimer()
     }
 
