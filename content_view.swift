@@ -8,19 +8,22 @@ struct ContentView: View {
     var body: some View {
         NavigationStack{
             ZStack{
+                Color(red: 0.15, green: 0.15, blue: 0.15)
+                    .ignoresSafeArea()
+                
                 if audioManager.audioFiles.isEmpty{
                     VStack(spacing: 20){
                         Image(systemName: "moon.zzz.fill")
                         .font(.system(size: 60))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.red.opacity(0.8))
 
                         Text("No audio Files .·°՞(¯□¯)՞°·.")
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.red.opacity(0.8))
 
                         Text("press the + to add files")
-                        .foregroundStyle(.secondary)
+                            .foregroundStyle(.red.opacity(0.8))
                     }
                 } else {
                     List{
@@ -43,21 +46,29 @@ struct ContentView: View {
                             }
                         }
                         .onDelete(perform: deleteFiles)
+                        .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                     }
+                    
+                    .scrollContentBackground(.hidden)
+                    .background(Color(red: 0.15, green: 0.15, blue: 0.15))
                 }
             }
-            .navigationTitle("Audio Player or whatever")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing){
+                ToolbarItemGroup(placement: .bottomBar){
+                    Spacer()
+                    Spacer()
                     Button(action: {showingFilePicker = true}) {
                         Image(systemName: "plus")
                     }
+                    .foregroundStyle(.red)
                 }
             }
             .sheet(isPresented: $showingFilePicker) {
                 DocumentPicker(audioManager: audioManager)
             }
         }
+        .preferredColorScheme(.dark)
+        .tint(.red)
     }
     private func deleteFiles(at offsets: IndexSet){
         for index in offsets {
@@ -88,7 +99,7 @@ struct AudioFileRow: View {
             Spacer()
             if isCurrentlyPlaying{
                 Image(systemName: "speaker.wave.2.fill")
-                .foregroundStyle(.blue)
+                    .foregroundStyle(.red)
                 .font(.caption)
             }
         }
