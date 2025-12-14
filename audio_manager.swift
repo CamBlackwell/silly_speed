@@ -8,7 +8,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
     @Published var currentlyPlayingID: UUID?
-
+    
     private var audioPlayer: AVAudioPlayer?
     private var timer: Timer?
     private let fileDirectory: URL
@@ -47,11 +47,23 @@ class AudioManager: NSObject, ObservableObject {
                 try FileManager.default.removeItem(at: destinationURL)
             }
             try FileManager.default.copyItem(at: url, to: destinationURL)
-
-            let audioFile = AudioFile(fileName: fileName, fileURL: destinationURL)
-            audioFiles.append(audioFile)
-
-            saveAudioFiles()
+            
+            Task {
+                let asset = AVURLAsset(url: destinationURL, options: nil)
+                do {
+                    let duration = try await asset.load(.duration)
+                    let durationInSeconds = Float(CMTimeGetSeconds(duration))
+                    
+                    
+                    let audioFile = AudioFile(fileName: fileName, fileURL: destinationURL, audioDuration: durationInSeconds)
+                    await MainActor.run {
+                        audioFiles.append(audioFile)
+                        saveAudioFiles()
+                    }
+            } catch {
+                print("failed to load duration \(error)")
+            }
+        }
         } catch {
             print("failed to import file \(error.localizedDescription)")
         }

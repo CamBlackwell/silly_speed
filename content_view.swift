@@ -85,16 +85,21 @@ struct AudioFileRow: View {
     var body: some View {
         HStack {
             Image(systemName: isCurrentlyPlaying ?  "face.smiling.fill" : "face.smiling")
-            .foregroundStyle(isCurrentlyPlaying ? .blue : .gray)
+            .foregroundStyle(isCurrentlyPlaying ? .red : .gray)
             .font(.title2)
 
             VStack(alignment: .leading, spacing: 4){
                 Text(audioFile.fileName)
                     .font(.headline)
-
-                Text(audioFile.dateAdded, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                
+                HStack{
+                    Text(audioFile.dateAdded, style: .date)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(formatTime(audioFile.audioDuration))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if isCurrentlyPlaying{
@@ -104,6 +109,11 @@ struct AudioFileRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+    private func formatTime(_ time: Float) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 

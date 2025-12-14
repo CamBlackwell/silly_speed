@@ -5,10 +5,12 @@ struct AudioFile: Identifiable, Codable {
     let fileName: String
     let fileURL: URL
     let dateAdded: Date
-    init (fileName: String, fileURL: URL){
+    let audioDuration: Float
+    init (fileName: String, fileURL: URL, audioDuration: Float){
         self.id = UUID()
         self.fileName = fileName
         self.fileURL = fileURL
         self.dateAdded = Date()
+        self.audioDuration = audioDuration
     }
 }
