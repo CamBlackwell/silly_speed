@@ -64,7 +64,7 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     
-    private func changeAlgorithm(to algorithm: PitchAlgorithm){
+    func changeAlgorithm(to algorithm: PitchAlgorithm){
         guard algorithm.isImplemented else {
             print ("Algorithm \(algorithm.rawValue) not implemented yet")
             return
