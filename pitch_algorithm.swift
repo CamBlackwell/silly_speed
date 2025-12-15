@@ -1,6 +1,6 @@
 import Foundation
 
-enum PitchAlgorithm: String, CaseIterable, Codeable {
+enum PitchAlgorithm: String, CaseIterable, Codable {
     case apple = "Apple (Default)"
     case rubberBand = "Rubber Band (Best quality for extreme changes)"
     case soundTouch = "SoundTouch (Balanced quality and performance)"
