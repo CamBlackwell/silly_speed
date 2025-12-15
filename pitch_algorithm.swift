@@ -1,0 +1,17 @@
+import Foundation
+
+enum PitchAlgorithm: String, CaseIterable, Codeable {
+    case apple = "Apple (Default)"
+    case rubberBand = "Rubber Band (Best quality for extreme changes)"
+    case soundTouch = "SoundTouch (Balanced quality and performance)"
+    case signalSmith = "SignalSmith (Modern)"
+    
+    var isImplemented: Bool {
+        switch self {
+        case .apple:
+            return true
+        case .rubberBand, .soundTouch, .signalSmith:
+            return false
+        }
+    }
+}
