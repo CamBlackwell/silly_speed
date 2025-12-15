@@ -8,18 +8,37 @@ class AudioManager: NSObject, ObservableObject {
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
     @Published var currentlyPlayingID: UUID?
-    
-    private var audioPlayer: AVAudioPlayer?
+    @Published var tempo: Float = 1.0
+    @Published var pitch: Float = 0.0
+    @Published var selectedAlgorithm: PitchAlgorithm = .apple
+
+    private var currentEngine: AudioEngineProtocol?
+    //private var audioPlayer: AVAudioPlayer?
     private var timer: Timer?
     private let fileDirectory: URL
     private let audioFilesKey = "savedAudioFiles"
+    private let algorithmKey = "selectedAlgorithm"
 
     override init() {
         self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         super.init()
         loadAudioFiles()
+        loadSelectedAlgorithm()
         setupAudioSession()
+        initialiseEngine()
         
+    }
+    
+    private func loadSelectedAlgorithm(){
+        if let saved = UserDefaults.standard.string(forKey: algorithmKey),
+           let algorithm = PitchAlgorithm(rawValue: saved),
+           algorithm.isImplemented {
+            selectedAlgorithm = algorithm
+        }
+    }
+    
+    private func saveSelectedAlgorithm(){
+        UserDefaults.standard.set(selectedAlgorithm.rawValue, forKey: algorithmKey)
     }
 
     private func setupAudioSession(){
@@ -29,6 +48,46 @@ class AudioManager: NSObject, ObservableObject {
             try audioSession.setActive(true)
         } catch {
             print("failed to set up audio \(error.localizedDescription)")
+        }
+    }
+    
+    private func initialiseEngine(){
+        switch selectedAlgorithm {
+        case .apple:
+            currentEngine = AppleAudioEngine() //TODO ADD engines
+        case .rubberBand:
+            currentEngine = nil
+        case .soundTouch:
+            currentEngine = nil
+        case .signalSmith:
+            currentEngine = nil
+        }
+    }
+    
+    private func changeAlgorithm(to algorithm: PitchAlgorithm){
+        guard algorithm.isImplemented else {
+            print ("Algorithm \(algorithm.rawValue) not implemented yet")
+            return
+        }
+        
+        let wasPlaying = isPlaying
+        let currentAudioFile = audioFiles.first { $0.id == currentlyPlayingID }
+        let savedTime = currentTime
+        
+        stop()
+        
+        selectedAlgorithm = algorithm
+        saveSelectedAlgorithm()
+        initialiseEngine()
+        
+        if let audioFile = currentAudioFile {
+            currentEngine?.load(audioFile: audioFile)
+            currentEngine?.seek(to: savedTime)
+            currentEngine?.setTempo(tempo)
+            currentEngine?.setPitch(pitch)
+            if wasPlaying {
+                play(audioFile: audioFile)
+            }
         }
     }
 
@@ -108,23 +167,25 @@ class AudioManager: NSObject, ObservableObject {
 
     func play(audioFile: AudioFile){
         do {
-            audioPlayer = try AVAudioPlayer(contentsOf: audioFile.fileURL)
-            audioPlayer?.delegate = self
-            audioPlayer?.prepareToPlay()
-            audioPlayer?.play()
-
+            guard let engine = currentEngine else {
+                print("No engine available")
+                return
+            }
+            
+            engine.load(audioFile: audioFile)
+            engine.setTempo(tempo)
+            engine.setPitch(pitch)
+            engine.play()
+            
             isPlaying = true
             currentlyPlayingID = audioFile.id
-            duration = audioPlayer?.duration ?? 0
+            duration = TimeInterval(audioFile.audioDuration)
             startTimer()
-        } catch {
-            print("failed to play audio \(error.localizedDescription)")
         }
     }
 
     func stop(){
-        audioPlayer?.stop()
-        audioPlayer = nil
+        currentEngine?.stop()
         isPlaying = false
         currentTime = 0
         currentlyPlayingID = nil
@@ -132,32 +193,44 @@ class AudioManager: NSObject, ObservableObject {
     }
 
     func togglePlayPause() {
-        guard let player = audioPlayer else {return}
+        guard let engine = currentEngine else {return}
 
-        if player.isPlaying {
-            player.pause()
+        if engine.isPlaying {
+            engine.pause()
             isPlaying = false
             stopTimer()
         } else {
-            player.play()
+            engine.play()
             isPlaying = true
             startTimer()
         }
     }
 
     func seek(to time: TimeInterval){
-        audioPlayer?.currentTime = time
+        currentEngine?.seek(to: time)
         currentTime = time
     }
 
     func setVolume(_ volume: Float){
-        audioPlayer?.volume = volume
+        currentEngine?.setVolume(volume)
     }
+    
+    func setTempo(_ newTempo: Float){
+        tempo = max(0.25, min(4.0, newTempo))
+        currentEngine?.setTempo(tempo)
+    }
+    
+    func setPitch(_ newPitch: Float){
+        pitch = max(-2400, min(2400, newPitch))
+        currentEngine?.setPitch(pitch)
+    }
+    
+
 
     private func startTimer(){
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self, let player = self.audioPlayer else {return}
-            self.currentTime = player.currentTime
+            guard let self = self, let engine = self.currentEngine else {return}
+            self.currentTime = engine.currentTime
         }
     }
 
