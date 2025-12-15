@@ -46,11 +46,11 @@ struct AudioPlayerView: View {
                     
                     playbackControls
                     
-                    tempoControl
-                    
+                    volumeControl
+
                     pitchControl
                     
-                    volumeControl
+                    tempoControl
                     
                     resetButton
                     
@@ -271,21 +271,37 @@ struct AudioPlayerView: View {
     }
     
     private var resetButton: some View {
-        Button(action: {
-            audioManager.setTempo(1.0)
-            audioManager.setPitch(0.0)
-        }) {
-            HStack {
-                Image(systemName: "arrow.counterclockwise")
-                Text("Reset Speed & Pitch")
+        HStack {
+            Button(action: {
+                audioManager.setTempo(1.0)
+                
+            }) {
+                HStack {
+                    Image(systemName: "arrow.counterclockwise")
+                    Text("Reset Speed")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.red)
+                .padding()
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(10)
             }
-            .font(.subheadline)
-            .foregroundStyle(.red)
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(Color.white.opacity(0.1))
-            .cornerRadius(10)
+            .padding(.horizontal)
+            Button(action: {
+                audioManager.setPitch(0.0)
+                
+            }) {
+                HStack {
+                    Image(systemName: "arrow.counterclockwise")
+                    Text("Reset Pitch")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.red)
+                .padding()
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(10)
+            }
+            .padding(.horizontal)
         }
-        .padding(.horizontal)
     }
 }

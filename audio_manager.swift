@@ -238,6 +238,26 @@ class AudioManager: NSObject, ObservableObject {
         timer?.invalidate()
         timer = nil
     }
+    
+    func resetTempoAndPitch() {
+        let wasPlaying = isPlaying
+        
+        if wasPlaying {
+            togglePlayPause()
+        }
+        tempo = 1.0
+        pitch = 0
+        
+        currentEngine?.setTempo(1.0)
+        currentEngine?.setPitch(0.0)
+        
+        Task {
+            try await Task.sleep(for: .seconds(0.1))
+            if wasPlaying {
+                self.togglePlayPause()
+            }
+        }
+    }
 }
 extension AudioManager: AVAudioPlayerDelegate{
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool){
