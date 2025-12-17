@@ -31,6 +31,7 @@ struct ContentView: View {
                             NavigationLink(destination: AudioPlayerView(audioFile: audioFile, audioManager: audioManager)){ //FIX THIS LATER ITS NOT WHAT I WANT IT TO DO!!!!!
                                 AudioFileRow(audioFile: audioFile, isCurrentlyPlaying: audioManager.currentlyPlayingID == audioFile.id)
                             }
+                            .simultaneousGesture(TapGesture().onEnded{ audioManager.play(audioFile: audioFile)})
                         .contextMenu{ //hold down functionality
                             Button("share this file", systemImage: "square.and.arrow.up") {} //TODO
                             //share(AudioFile)
