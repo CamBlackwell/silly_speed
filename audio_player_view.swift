@@ -6,7 +6,9 @@ struct AudioPlayerView: View {
     @State private var volume: Float = 1.0
     @State var color: Color = .blue
     @State private var isScrubbing: Bool = false
-    
+    @State private var sliderValue: Double = 0
+    @State private var isDragging = false
+
     var body: some View {
         ZStack {
             Color(red: 0.15, green: 0.15, blue: 0.15)
@@ -119,15 +121,22 @@ struct AudioPlayerView: View {
     private var timeSlider: some View {
         VStack(spacing: 8) {
             Slider(
-                value: Binding(
-                    get: { audioManager.currentTime },
-                    set: { audioManager.seek(to: $0) }
-                ),
-                in: 0...max(audioManager.duration, 0.01)
+                value: $sliderValue,
+                in: 0...max(audioManager.duration, 0.01),
+                onEditingChanged: { editing in
+                    isDragging = editing
+                    if !editing {
+                        audioManager.seek(to: sliderValue)
+                    }
+                }
             )
             .tint(.red)
             .disabled(audioManager.currentlyPlayingID != audioFile.id)
-            
+            .onChange(of: audioManager.currentTime) {
+                if !isDragging {
+                    sliderValue = audioManager.currentTime
+                }
+            }
             HStack {
                 Text(formatTime(audioManager.currentTime))
                     .font(.caption)

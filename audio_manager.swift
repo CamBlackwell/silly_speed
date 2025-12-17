@@ -11,6 +11,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var tempo: Float = 1.0
     @Published var pitch: Float = 0.0
     @Published var selectedAlgorithm: PitchAlgorithm = .apple
+    
 
     private var currentEngine: AudioEngineProtocol?
     private var timer: Timer?
