@@ -13,11 +13,11 @@ class AudioManager: NSObject, ObservableObject {
     @Published var selectedAlgorithm: PitchAlgorithm = .apple
 
     private var currentEngine: AudioEngineProtocol?
-    //private var audioPlayer: AVAudioPlayer?
     private var timer: Timer?
     private let fileDirectory: URL
     private let audioFilesKey = "savedAudioFiles"
     private let algorithmKey = "selectedAlgorithm"
+    private var isSeeking = false
 
     override init() {
         self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -211,9 +211,14 @@ class AudioManager: NSObject, ObservableObject {
     }
 
     func seek(to time: TimeInterval){
-        currentEngine?.seek(to: time)
-        currentTime = time
-    }
+            isSeeking = true
+            currentEngine?.seek(to: time)
+            currentTime = time
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.isSeeking = false
+            }
+        }
 
     func setVolume(_ volume: Float){
         currentEngine?.setVolume(volume)
@@ -232,11 +237,17 @@ class AudioManager: NSObject, ObservableObject {
 
 
     private func startTimer(){
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self, let engine = self.currentEngine else {return}
-            self.currentTime = engine.currentTime
+            timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                guard let self = self, let engine = self.currentEngine else { return }
+                
+                if self.isSeeking {
+                    return  // Don't update while seeking
+                }
+                
+                self.currentTime = engine.currentTime
+            }
         }
-    }
+
 
     private func stopTimer(){
         timer?.invalidate()

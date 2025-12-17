@@ -6,17 +6,18 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
     private let playerNode = AVAudioPlayerNode()
     private let timePitch = AVAudioUnitTimePitch()
     private var audioFile: AVAudioFile?
+    private var seekOffset: TimeInterval = 0
     
     var isPlaying: Bool{
         return playerNode.isPlaying
     }
     
     var currentTime: TimeInterval {
-        guard let nodeTime = playerNode.lastRenderTime,
-              let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else {
-            return 0
-        }
-        return Double(playerTime.sampleTime) / playerTime.sampleRate
+            guard let nodeTime = playerNode.lastRenderTime,
+                  let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else {
+                return seekOffset  // Return last known position
+            }
+            return seekOffset + (Double(playerTime.sampleTime) / playerTime.sampleRate)
     }
     
     var duration: TimeInterval {
@@ -46,6 +47,7 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
     func load(audioFile: AudioFile){
         do {
             self.audioFile = try AVAudioFile(forReading: audioFile.fileURL)
+            seekOffset = 0
         } catch {
             print("failed to load audioFile: \(error)")
         }
@@ -65,23 +67,31 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
     
     func stop() {
         playerNode.stop()
+        seekOffset = 0
     }
     
     func seek(to time: TimeInterval) {
         guard let file = audioFile else { return }
         
-        let wasPlaying = isPlaying
-        playerNode.stop() //probably gonna cause issues
+        let wasPlaying = playerNode.isPlaying
+        playerNode.stop()
+        seekOffset = time
         
         let sampleRate = file.fileFormat.sampleRate
         let startFrame = AVAudioFramePosition(time * sampleRate)
+        let frameCount = AVAudioFrameCount(file.length - startFrame)
         
-        if startFrame < file.length {
-            playerNode.scheduleSegment(file, startingFrame: startFrame, frameCount: AVAudioFrameCount(file.length - startFrame), at: nil)
-            
-            if wasPlaying {
-                playerNode.play()
-            }
+        guard startFrame >= 0 && startFrame < file.length else { return }
+        
+        playerNode.scheduleSegment(
+            file,
+            startingFrame: startFrame,
+            frameCount: frameCount,
+            at: nil
+        )
+        
+        if wasPlaying {
+            playerNode.play()  // Resume if it was playing
         }
     }
     
@@ -97,22 +107,6 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
     func setPitch(_ pitch: Float){
         timePitch.pitch = pitch
         //refreshAudio()
-    }
-    private func refreshAudio(){
-        guard let file = audioFile else { return }
-        let wasPlaying = isPlaying
-        let currentPos = currentTime
-        
-        playerNode.stop()
-        playerNode.scheduleFile(file, at: nil)
-        
-        if currentPos > 0 {
-            seek(to: currentPos)
-        }
-        
-        if wasPlaying {
-            playerNode.play()
-        }
     }
 }
         

@@ -123,20 +123,10 @@ struct AudioPlayerView: View {
                     get: { audioManager.currentTime },
                     set: { audioManager.seek(to: $0) }
                 ),
-                in: 0...max(audioManager.duration, 0.01),
-                onEditingChanged: { editing in
-                    if editing {
-                        // User started dragging - stop timer updates
-                        isScrubbing = true
-                    } else {
-                        // User finished dragging - allow timer updates
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            isScrubbing = false
-                        }
-                    }
-                }
+                in: 0...max(audioManager.duration, 0.01)
             )
             .tint(.red)
+            .disabled(audioManager.currentlyPlayingID != audioFile.id)
             
             HStack {
                 Text(formatTime(audioManager.currentTime))

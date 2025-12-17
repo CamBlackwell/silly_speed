@@ -11,7 +11,7 @@ enum PitchAlgorithm: String, CaseIterable, Codable {
         case .apple:
             return true
         case .rubberBand, .soundTouch, .signalSmith:
-            return true
+            return false
         }
     }
 }
