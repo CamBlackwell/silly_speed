@@ -91,10 +91,28 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
     
     func setTempo(_ tempo: Float){
         timePitch.rate = tempo
+        //refreshAudio()
     }
     
     func setPitch(_ pitch: Float){
         timePitch.pitch = pitch
+        //refreshAudio()
+    }
+    private func refreshAudio(){
+        guard let file = audioFile else { return }
+        let wasPlaying = isPlaying
+        let currentPos = currentTime
+        
+        playerNode.stop()
+        playerNode.scheduleFile(file, at: nil)
+        
+        if currentPos > 0 {
+            seek(to: currentPos)
+        }
+        
+        if wasPlaying {
+            playerNode.play()
+        }
     }
 }
         

@@ -5,6 +5,7 @@ struct AudioPlayerView: View {
     @ObservedObject var audioManager: AudioManager
     @State private var volume: Float = 1.0
     @State var color: Color = .blue
+    @State private var isScrubbing: Bool = false
     
     var body: some View {
         ZStack {
@@ -13,6 +14,7 @@ struct AudioPlayerView: View {
             
             ScrollView {
                 VStack(spacing: 30) {
+                    
                     Spacer()
                     
                     ZStack {
@@ -46,8 +48,6 @@ struct AudioPlayerView: View {
                     
                     playbackControls
                     
-                    volumeControl
-
                     pitchControl
                     
                     tempoControl
@@ -94,7 +94,7 @@ struct AudioPlayerView: View {
                         }
                     }
                 }
-                .disabled(!algorithm.isImplemented)
+                //.disabled(!algorithm.isImplemented)
             }
         } label: {
             HStack {
@@ -123,10 +123,20 @@ struct AudioPlayerView: View {
                     get: { audioManager.currentTime },
                     set: { audioManager.seek(to: $0) }
                 ),
-                in: 0...max(audioManager.duration, 0.01)
+                in: 0...max(audioManager.duration, 0.01),
+                onEditingChanged: { editing in
+                    if editing {
+                        // User started dragging - stop timer updates
+                        isScrubbing = true
+                    } else {
+                        // User finished dragging - allow timer updates
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            isScrubbing = false
+                        }
+                    }
+                }
             )
             .tint(.red)
-            .disabled(audioManager.currentlyPlayingID != audioFile.id)
             
             HStack {
                 Text(formatTime(audioManager.currentTime))
