@@ -1,6 +1,7 @@
 import Foundation 
 import AVFoundation
 import Combine
+import MediaPlayer
 
 class AudioManager: NSObject, ObservableObject {
     @Published var audioFiles: [AudioFile] = []
@@ -47,9 +48,53 @@ class AudioManager: NSObject, ObservableObject {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.playback, mode: .default)
             try audioSession.setActive(true)
+            UIApplication.shared.beginReceivingRemoteControlEvents()
+                    setupRemoteTransportControls()
         } catch {
             print("failed to set up audio \(error.localizedDescription)")
         }
+    }
+    
+    private func setupRemoteTransportControls() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        
+        commandCenter.playCommand.addTarget { [weak self] event in
+            guard let self = self else { return .commandFailed }
+            if let currentFile = self.audioFiles.first(where: { $0.id == self.currentlyPlayingID }) {
+                self.togglePlayPause()
+                return .success
+            }
+            return .commandFailed
+        }
+        
+        commandCenter.pauseCommand.addTarget { [weak self] event in
+            self?.togglePlayPause()
+            return .success
+        }
+        
+        commandCenter.changePlaybackPositionCommand.isEnabled = true
+        commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let self = self,
+                  let positionEvent = event as? MPChangePlaybackPositionCommandEvent else {
+                return .commandFailed
+            }
+            self.seek(to: positionEvent.positionTime)
+            return .success
+        }
+    }
+    
+    private func updateNowPlayingInfo() {
+        guard let currentFile = audioFiles.first(where: { $0.id == currentlyPlayingID }) else {
+            return
+        }
+        
+        var nowPlayingInfo = [String: Any]()
+        nowPlayingInfo[MPMediaItemPropertyTitle] = currentFile.fileName
+        nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
+        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
     
     private func initialiseEngine(){
@@ -190,6 +235,7 @@ class AudioManager: NSObject, ObservableObject {
             currentlyPlayingID = audioFile.id
             duration = TimeInterval(audioFile.audioDuration)
             startTimer()
+            updateNowPlayingInfo()
         }
     }
 
@@ -208,10 +254,12 @@ class AudioManager: NSObject, ObservableObject {
             engine.pause()
             isPlaying = false
             stopTimer()
+            updateNowPlayingInfo()
         } else {
             engine.play()
             isPlaying = true
             startTimer()
+            updateNowPlayingInfo()
         }
     }
 
@@ -250,6 +298,7 @@ class AudioManager: NSObject, ObservableObject {
                 }
                 
                 self.currentTime = engine.currentTime
+                self.updateNowPlayingInfo()
             }
         }
 
