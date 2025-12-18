@@ -14,52 +14,32 @@ struct AudioPlayerView: View {
             Color(red: 0.15, green: 0.15, blue: 0.15)
                 .ignoresSafeArea()
             
-            ScrollView {
-                VStack(spacing: 30) {
+            VStack(spacing: 30) {
+                
+                VStack(spacing: 8) {
+                    Text(audioFile.fileName)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
                     
-                    Spacer()
-                    
-                    ZStack {
-                        Circle()
-                            .fill(LinearGradient(
-                                gradient: Gradient(colors: [.red, .pink]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .frame(width: 200, height: 200)
-                        
-                        Image(systemName: "music.note")
-                            .font(.system(size: 80))
-                            .foregroundStyle(.white)
-                    }
-                    .shadow(radius: 10)
-                    
-                    VStack(spacing: 8) {
-                        Text(audioFile.fileName)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                        
-                    }
-                    .padding(.horizontal)
-                    
-                    Spacer()
-                    
-                    timeSlider
-                    
-                    playbackControls
-                    
-                    pitchControl
-                    
-                    tempoControl
-                    
-                    resetButton
-                    
-                    Spacer()
                 }
-                .padding()
+                .padding(.horizontal)
+                
+                
+                Spacer()
+
+                
+                pitchControl
+                
+                timeSlider
+                
+                tempoControl
+                
+                playbackControls
+
             }
+            .padding()
         }
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
@@ -141,9 +121,7 @@ struct AudioPlayerView: View {
                 Text(formatTime(audioManager.currentTime))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                
                 Spacer()
-                
                 Text(formatTime(audioManager.duration))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -200,16 +178,18 @@ struct AudioPlayerView: View {
                 Text("\(audioManager.tempo, specifier: "%.2f")x")
                     .font(.subheadline)
                     .fontWeight(.semibold)
+                Spacer()
+                resetTempoButton
             }
             
             Slider(value: Binding(
                 get: { audioManager.tempo },
                 set: { audioManager.setTempo($0) }
-            ), in: 0.25...4.0)
+            ), in: 0.1...2.0)
             .tint(.red)
             
             HStack {
-                Text("0.25x")
+                Text("0.1x")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -217,7 +197,7 @@ struct AudioPlayerView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("4.0x")
+                Text("2.0x")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -235,6 +215,8 @@ struct AudioPlayerView: View {
                 Text("\(audioManager.pitch / 100, specifier: "%.1f") semitones")
                     .font(.subheadline)
                     .fontWeight(.semibold)
+                Spacer()
+                resetPitchButton
             }
             
             Slider(value: Binding(
@@ -279,7 +261,7 @@ struct AudioPlayerView: View {
         .padding(.horizontal)
     }
     
-    private var resetButton: some View {
+    private var resetTempoButton: some View {
         HStack {
             Button(action: {
                 audioManager.setTempo(1.0)
@@ -287,28 +269,27 @@ struct AudioPlayerView: View {
             }) {
                 HStack {
                     Image(systemName: "arrow.counterclockwise")
-                    Text("Reset Speed")
+                    //Text("Reset Speed")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.red)
-                .padding()
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(10)
             }
             .padding(.horizontal)
+        }
+    }
+    
+    private var resetPitchButton: some View {
+        HStack {
             Button(action: {
-                audioManager.setPitch(0.0)
+                audioManager.setPitch(1.0)
                 
             }) {
                 HStack {
                     Image(systemName: "arrow.counterclockwise")
-                    Text("Reset Pitch")
+                    //Text("Reset Pitch")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.red)
-                .padding()
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(10)
             }
             .padding(.horizontal)
         }

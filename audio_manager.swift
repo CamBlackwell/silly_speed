@@ -226,7 +226,7 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     func setTempo(_ newTempo: Float){
-        tempo = max(0.25, min(4.0, newTempo))
+        tempo = max(0.1, min(4.0, newTempo))
         currentEngine?.setTempo(tempo)
     }
     
