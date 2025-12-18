@@ -8,7 +8,7 @@ struct AudioPlayerView: View {
     @State private var isScrubbing: Bool = false
     @State private var sliderValue: Double = 0
     @State private var isDragging = false
-
+    
     var body: some View {
         ZStack {
             Color(red: 0.15, green: 0.15, blue: 0.15)
@@ -26,15 +26,16 @@ struct AudioPlayerView: View {
                 }
                 .padding(.horizontal)
                 
+                algorithmSelector
                 
                 Spacer()
 
                 
+                tempoControl
+                
                 pitchControl
                 
                 timeSlider
-                
-                tempoControl
                 
                 playbackControls
 
@@ -56,48 +57,38 @@ struct AudioPlayerView: View {
     }
     
     private var algorithmSelector: some View {
-        Menu {
-            ForEach(PitchAlgorithm.allCases, id: \.self) { algorithm in
+        let implementedAlgorithms = PitchAlgorithm.allCases.filter { $0.isImplemented }
+        
+        return Menu {
+            ForEach(implementedAlgorithms, id: \.self) { algorithm in
                 Button(action: {
                     audioManager.changeAlgorithm(to: algorithm)
                 }) {
                     HStack {
-                        VStack(alignment: .leading) {
-                            Text(algorithm.rawValue)
-                            if !algorithm.isImplemented {
-                                Text("Coming Soon")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        Text(algorithm.rawValue)
                         Spacer()
                         if audioManager.selectedAlgorithm == algorithm {
                             Image(systemName: "checkmark")
                         }
                     }
                 }
-                //.disabled(!algorithm.isImplemented)
             }
         } label: {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Algorithm")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(audioManager.selectedAlgorithm.rawValue)
-                        .font(.subheadline)
-                }
-                Spacer()
+                Text("Algorithm: \(audioManager.selectedAlgorithm.rawValue)")
+                    .font(.subheadline)
                 Image(systemName: "chevron.down")
                     .font(.caption)
             }
             .padding()
             .background(Color.white.opacity(0.1))
-            .cornerRadius(10)
+            .cornerRadius(12)
         }
         .padding(.horizontal)
     }
-    
+
+
+
     private var timeSlider: some View {
         VStack(spacing: 8) {
             Slider(
@@ -185,7 +176,7 @@ struct AudioPlayerView: View {
             Slider(value: Binding(
                 get: { audioManager.tempo },
                 set: { audioManager.setTempo($0) }
-            ), in: 0.1...2.0)
+            ), in: 0.1...1.9)
             .tint(.red)
             
             HStack {

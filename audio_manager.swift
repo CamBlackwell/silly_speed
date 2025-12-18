@@ -83,11 +83,15 @@ class AudioManager: NSObject, ObservableObject {
         
         if let audioFile = currentAudioFile {
             currentEngine?.load(audioFile: audioFile)
-            currentEngine?.seek(to: savedTime)
             currentEngine?.setTempo(tempo)
             currentEngine?.setPitch(pitch)
-            if wasPlaying {
-                play(audioFile: audioFile)
+            
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.currentEngine?.seek(to: savedTime)
+                if wasPlaying {
+                    self.play(audioFile: audioFile)
+                }
             }
         }
     }

@@ -1,5 +1,5 @@
 import SwiftUI
-import UniformTypeIdentifiers 
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var audioManager = AudioManager()
@@ -173,7 +173,7 @@ struct BottomPlayerControls: View {
 
 struct AudioFileRow: View {
     let audioFile: AudioFile
-    let isCurrentlyPlaying: Bool 
+    let isCurrentlyPlaying: Bool
 
     var body: some View {
         HStack {
@@ -216,7 +216,7 @@ struct DocumentPicker: UIViewControllerRepresentable{
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController{
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audio])
-        picker.allowsMultipleSelection = true 
+        picker.allowsMultipleSelection = true
         picker.delegate = context.coordinator
         return picker
     }
