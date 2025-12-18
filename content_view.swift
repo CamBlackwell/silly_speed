@@ -28,7 +28,7 @@ struct ContentView: View {
                 } else {
                     List{
                         ForEach(audioManager.audioFiles) {audioFile in
-                            NavigationLink(destination: AudioPlayerView(audioFile: audioFile, audioManager: audioManager)){ //FIX THIS LATER ITS NOT WHAT I WANT IT TO DO!!!!!
+                            NavigationLink(destination: AudioPlayerView(audioFile: audioFile, audioManager: audioManager)){
                                 AudioFileRow(audioFile: audioFile, isCurrentlyPlaying: audioManager.currentlyPlayingID == audioFile.id)
                             }
                             .simultaneousGesture(TapGesture().onEnded{ audioManager.play(audioFile: audioFile)})
@@ -56,8 +56,29 @@ struct ContentView: View {
             }
             .toolbar {
                 ToolbarItemGroup(placement: .bottomBar){
-                    Spacer()
-                    Spacer()
+                    if audioManager.currentlyPlayingID != nil {
+                        Button(action: {}) {
+                            Image(systemName: "backward.fill")
+                                .font(.title)
+                                .foregroundStyle(.secondary)
+                        }
+                        .disabled(true)
+                        Spacer()
+                        Button {
+                            audioManager.togglePlayPause()
+                        } label: {
+                            Image(systemName: audioManager.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        }
+                        Spacer()
+                        Button(action: {}) {
+                            Image(systemName: "backwards.fill")
+                                .font(.title)
+                                .foregroundStyle(.secondary)
+                        }
+                        .disabled(true)
+                    }
+                }
+                ToolbarItemGroup(placement: .navigationBarTrailing){
                     Button(action: {showingFilePicker = true}) {
                         Image(systemName: "plus")
                     }
@@ -155,3 +176,5 @@ struct DocumentPicker: UIViewControllerRepresentable{
 
     }
 }
+
+
