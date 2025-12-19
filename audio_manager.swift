@@ -92,7 +92,7 @@ class AudioManager: NSObject, ObservableObject {
         nowPlayingInfo[MPMediaItemPropertyTitle] = currentFile.fileName
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
         nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
-        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 0.0 : 1.0
         
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
@@ -294,7 +294,7 @@ class AudioManager: NSObject, ObservableObject {
                 guard let self = self, let engine = self.currentEngine else { return }
                 
                 if self.isSeeking {
-                    return  // Don't update while seeking
+                    return //if seeking dont update
                 }
                 
                 self.currentTime = engine.currentTime
