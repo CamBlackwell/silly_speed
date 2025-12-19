@@ -33,15 +33,28 @@ struct ContentView: View {
                         )
                     }
                 }
-            }
-            .toolbar {
-                ToolbarItemGroup(placement: .bottomBar) {
-                }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button(action: { showingFilePicker = true }) {
-                        Image(systemName: "plus")
+                
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: { showingFilePicker = true }) {
+                            ZStack {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .opacity(0.50)
+                                    .frame(width: 60, height: 60)
+                                    .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                                    .glassEffect()
+                                
+                                Image(systemName: "plus")
+                                    .font(.system(size: 24, weight: .semibold))
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.top, 20)
                     }
-                    .foregroundStyle(.red)
+                    Spacer()
                 }
             }
             .sheet(isPresented: $showingFilePicker) {
@@ -272,79 +285,95 @@ struct MiniPlayerBar: View {
                 selectedAudioFile = audioFile
                 navigateToPlayer = true
             } label: {
-                HStack(spacing: 12) {
-                    // Artwork
-                    ZStack {
-                        Circle()
-                            .fill(LinearGradient(
-                                gradient: Gradient(colors: [.red, .pink]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .frame(width: 50, height: 50)
-                        
-                        Image(systemName: "music.note")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
-                    
-                    // Track info
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(audioFile.fileName)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-                            .foregroundStyle(.primary)
-                        
-                        Text(formatTime(audioFile.audioDuration))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    // Controls
-                    HStack(spacing: 20) {
-                        Button {
-                            // Skip backward (disabled for now)
-                        } label: {
-                            Image(systemName: "backward.fill")
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
+                VStack(spacing: 0) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(audioFile.fileName)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .lineLimit(1)
+                                .foregroundStyle(.primary)
+                            
+                            HStack {
+                                Text(formatTime(Float(audioManager.currentTime)))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                
+                                Text(formatTime(audioFile.audioDuration))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            GeometryReader { geometry in
+                                ZStack(alignment: .leading) {
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(height: 3)
+                                    
+                                    Rectangle()
+                                        .fill(Color.red)
+                                        .frame(width: geometry.size.width * progressPercentage, height: 3)
+                                }
+                            }
+                            .frame(height: 3)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+
                         }
-                        .disabled(true)
-                        .buttonStyle(PlainButtonStyle())
                         
-                        Button {
-                            audioManager.togglePlayPause()
-                        } label: {
-                            Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
-                                .font(.title2)
-                                .foregroundStyle(.red)
-                        }
-                        .buttonStyle(PlainButtonStyle())
+                        Spacer()
                         
-                        Button {
-                            // Skip forward (disabled for now)
-                        } label: {
-                            Image(systemName: "forward.fill")
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
+                        HStack(spacing: 20) {
+                            Button {
+                                // Skip backward (disabled for now)
+                            } label: {
+                                Image(systemName: "backward.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .disabled(true)
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Button {
+                                audioManager.togglePlayPause()
+                            } label: {
+                                Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Button {
+                                // Skip forward (disabled for now)
+                            } label: {
+                                Image(systemName: "forward.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .disabled(true)
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .disabled(true)
-                        .buttonStyle(PlainButtonStyle())
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial)
-                .cornerRadius(16)
-                .shadow(color: .black.opacity(0.1), radius: 10, y: -5)
+                //.background(.ultraThinMaterial)
+                //.cornerRadius(16)
+                //.shadow(color: .black.opacity(0.1), radius: 10, y: -5)
             }
             .buttonStyle(PlainButtonStyle())
-            .padding(.horizontal)
+            .glassEffect(in: .rect(cornerRadius: 16.0))
             .padding(.bottom, 8)
+            .padding(.horizontal, 4)
         }
+
+    }
+    
+    private var progressPercentage: CGFloat {
+        guard audioManager.duration > 0 else { return 0 }
+        return CGFloat(audioManager.currentTime / audioManager.duration)
     }
     
     private func formatTime(_ time: Float) -> String {
@@ -353,5 +382,3 @@ struct MiniPlayerBar: View {
         return String(format: "%d:%02d", minutes, seconds)
     }
 }
-
-
