@@ -14,33 +14,31 @@ struct AudioPlayerView: View {
             Color(red: 0.15, green: 0.15, blue: 0.15)
                 .ignoresSafeArea()
             
-            VStack(spacing: 30) {
-                
                 VStack(spacing: 8) {
+                    
                     Text(audioFile.fileName)
                         .font(.title2)
-                        .fontWeight(.bold)
+                        .fontDesign(.serif)
+                        .fontWeight(.heavy)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
+
+                    algorithmSelector
+                    
+                    Spacer()
+                    
+                    Spacer()
+
+                    tempoControl
+                    
+                    pitchControl
+                    
+                    timeSlider
+                    
+                    playbackControls
                     
                 }
-                .padding(.horizontal)
-                
-                algorithmSelector
-                
-                Spacer()
-
-                
-                tempoControl
-                
-                pitchControl
-                
-                timeSlider
-                
-                playbackControls
-
-            }
-            .padding()
+                .padding()
         }
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
@@ -75,14 +73,17 @@ struct AudioPlayerView: View {
             }
         } label: {
             HStack {
-                Text("Algorithm: \(audioManager.selectedAlgorithm.rawValue)")
+                Text("\(audioManager.selectedAlgorithm.rawValue)")
                     .font(.subheadline)
+                    .tint(.white)
                 Image(systemName: "chevron.down")
                     .font(.caption)
+                    .tint(.white)
             }
             .padding()
-            .background(Color.white.opacity(0.1))
-            .cornerRadius(12)
+            .glassEffect(.clear)
+            //.background(Color.white.opacity(0.1))
+            //.cornerRadius(12)
         }
         .padding(.horizontal)
     }
@@ -141,6 +142,7 @@ struct AudioPlayerView: View {
                     Circle()
                         .fill(Color.red)
                         .frame(width: 70, height: 70)
+                        //.glassEffect(.clear.tint(.red).interactive())
                     
                     Image(systemName: isThisFilePlaying ? "pause.fill" : "play.fill")
                         .font(.title)
@@ -178,7 +180,7 @@ struct AudioPlayerView: View {
                 set: { audioManager.setTempo($0) }
             ), in: 0.1...1.9)
             .tint(.red)
-            
+
             HStack {
                 Text("0.1x")
                     .font(.caption2)
