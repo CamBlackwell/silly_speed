@@ -29,6 +29,8 @@ class AudioManager: NSObject, ObservableObject {
         loadSelectedAlgorithm()
         setupAudioSession()
         initialiseEngine()
+        setupInterruptionObserver()
+        setupRouteChangeObserver()
         
     }
     
@@ -61,7 +63,7 @@ class AudioManager: NSObject, ObservableObject {
         
         commandCenter.playCommand.addTarget { [weak self] event in
             guard let self = self else { return .commandFailed }
-            if let currentFile = self.audioFiles.first(where: { $0.id == self.currentlyPlayingID }) {
+            if self.audioFiles.first(where: { $0.id == self.currentlyPlayingID }) != nil {
                 self.togglePlayPause()
                 return .success
             }
@@ -220,6 +222,50 @@ class AudioManager: NSObject, ObservableObject {
             print("failed to load Audio Files \(error.localizedDescription)")
         }
 
+    }
+    
+    private func setupInterruptionObserver() {
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+
+            if type == .began { //an interruption started
+                self?.isPlaying = false
+                self?.stopTimer()
+            } else if type == .ended { //interruption ended
+                if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                    let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                    if options.contains(.shouldResume) {
+                        self?.currentEngine?.play()
+                        self?.isPlaying = true
+                        self?.startTimer()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func setupRouteChangeObserver() {
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
+
+            if reason == .oldDeviceUnavailable { //headphones were disconnected
+                DispatchQueue.main.async {
+                    self?.togglePlayPause()
+                }
+            }
+        }
     }
 
 
