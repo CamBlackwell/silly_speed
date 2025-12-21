@@ -31,7 +31,26 @@ class AudioManager: NSObject, ObservableObject {
         initialiseEngine()
         setupInterruptionObserver()
         setupRouteChangeObserver()
-        
+        setupConfigurationChangeObserver()
+    }
+    
+    private func setupConfigurationChangeObserver() {
+        NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self, self.isPlaying else { return }
+            
+            if let engine = self.currentEngine?.getAudioEngine() {
+                do {
+                    engine.prepare()
+                    try engine.start()
+                } catch {
+                    print("Failed to restart engine after config change: \(error)")
+                }
+            }
+        }
     }
     
     private func loadSelectedAlgorithm(){
@@ -86,6 +105,57 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     
+    private func setupInterruptionObserver() {
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self,
+                  let userInfo = notification.userInfo,
+                  let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+
+            if type == .began {
+                self.isPlaying = false
+                self.stopTimer()
+                self.currentEngine?.pause()
+            } else if type == .ended {
+                if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                    let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                    if options.contains(.shouldResume) {
+                        do {
+                            try AVAudioSession.sharedInstance().setActive(true)
+                            self.currentEngine?.play()
+                            self.isPlaying = true
+                            self.startTimer()
+                        } catch {
+                            print("Resume error: \(error)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func setupRouteChangeObserver() {
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
+
+            if reason == .oldDeviceUnavailable { //headphones were disconnected
+                DispatchQueue.main.async {
+                    self?.togglePlayPause()
+                }
+            }
+        }
+    }
+    
     private func updateNowPlayingInfo() {
         guard let currentFile = audioFiles.first(where: { $0.id == currentlyPlayingID }) else {
             return
@@ -95,7 +165,7 @@ class AudioManager: NSObject, ObservableObject {
         nowPlayingInfo[MPMediaItemPropertyTitle] = currentFile.fileName
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
         nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
-        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 0.0 : 1.0
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? Double(tempo) : 0.0
         
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
@@ -224,82 +294,52 @@ class AudioManager: NSObject, ObservableObject {
 
     }
     
-    private func setupInterruptionObserver() {
-        NotificationCenter.default.addObserver(
-            forName: AVAudioSession.interruptionNotification,
-            object: AVAudioSession.sharedInstance(),
-            queue: .main
-        ) { [weak self] notification in
-            guard let userInfo = notification.userInfo,
-                  let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
-                  let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
-
-            if type == .began { //an interruption started
-                self?.isPlaying = false
-                self?.stopTimer()
-            } else if type == .ended { //interruption ended
-                if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
-                    let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-                    if options.contains(.shouldResume) {
-                        self?.currentEngine?.play()
-                        self?.isPlaying = true
-                        self?.startTimer()
-                    }
-                }
-            }
-        }
-    }
-    
-    private func setupRouteChangeObserver() {
-        NotificationCenter.default.addObserver(
-            forName: AVAudioSession.routeChangeNotification,
-            object: AVAudioSession.sharedInstance(),
-            queue: .main
-        ) { [weak self] notification in
-            guard let userInfo = notification.userInfo,
-                  let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
-                  let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
-
-            if reason == .oldDeviceUnavailable { //headphones were disconnected
-                DispatchQueue.main.async {
-                    self?.togglePlayPause()
-                }
-            }
-        }
-    }
 
 
 
-    func play(audioFile: AudioFile){
+    func play(audioFile: AudioFile) {
+        let session = AVAudioSession.sharedInstance()
         do {
-            guard let engine = currentEngine else {
-                print("No engine available")
-                return
-            }
-            
-            if currentlyPlayingID != audioFile.id {
-                stop()
-            }
-            
-            engine.load(audioFile: audioFile)
-            engine.setTempo(tempo)
-            engine.setPitch(pitch)
-            engine.play()
-            
-            isPlaying = true
-            currentlyPlayingID = audioFile.id
-            duration = TimeInterval(audioFile.audioDuration)
-            startTimer()
-            updateNowPlayingInfo()
+            // 1. Ensure category is correct (in case it was changed by another app)
+            try session.setCategory(.playback, mode: .default)
+            // 2. Activate
+            try session.setActive(true)
+        } catch {
+            print("Could not activate session: \(error)")
+            return
         }
+
+        guard let engine = currentEngine else { return }
+
+        if currentlyPlayingID != audioFile.id {
+            engine.stop()
+        }
+
+        engine.load(audioFile: audioFile)
+        engine.setTempo(tempo)
+        engine.setPitch(pitch)
+        
+        engine.play()
+
+        isPlaying = true
+        currentlyPlayingID = audioFile.id
+        duration = TimeInterval(audioFile.audioDuration)
+        startTimer()
+        updateNowPlayingInfo()
     }
 
-    func stop(){
+    func stop() {
         currentEngine?.stop()
         isPlaying = false
         currentTime = 0
         currentlyPlayingID = nil
         stopTimer()
+        
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("Deactivation failed: \(error)")
+        }
     }
 
     func togglePlayPause() {

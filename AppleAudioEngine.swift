@@ -41,6 +41,8 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
         audioEngine.connect(playerNode, to: timePitch, format: nil)
         audioEngine.connect(timePitch, to: audioEngine.mainMixerNode, format: nil)
         
+        audioEngine.prepare()
+        
         do {
             try audioEngine.start()
         } catch {
@@ -58,10 +60,33 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
         
     }
     
-    func play(){
+    func play() {
         guard let file = audioFile else { return }
         
-        playerNode.scheduleFile(file, at: nil)
+        if !audioEngine.isRunning {
+            do {
+                audioEngine.prepare()
+                try audioEngine.start()
+            } catch {
+                print("Could not start engine: \(error)")
+                return
+            }
+        }
+        
+        if !playerNode.isPlaying {
+            if seekOffset > 0 {
+                let sampleRate = file.fileFormat.sampleRate
+                let startFrame = AVAudioFramePosition(seekOffset * sampleRate)
+                let frameCount = AVAudioFrameCount(file.length - startFrame)
+                
+                if startFrame < file.length {
+                    playerNode.scheduleSegment(file, startingFrame: startFrame, frameCount: frameCount, at: nil)
+                }
+            } else {
+                playerNode.scheduleFile(file, at: nil)
+            }
+        }
+        
         playerNode.play()
     }
     
