@@ -8,16 +8,18 @@ class GoniometerManager: ObservableObject {
     @Published var rightSamples: [Float] = []
     @Published var phaseCorrelation: Float = 0.0
     
-    private var leftTap: BaseTap?
-    private var rightTap: BaseTap?
     private let bufferSize: AVAudioFrameCount = 512
-    private let maxPoints = 100  // Keep last 100 points for trails
+    private let maxPoints = 100
     
     func attach(to audioEngine: AVAudioEngine) {
         let mixer = audioEngine.mainMixerNode
-        let format = mixer.outputFormat(forBus: 0)
         
-        // Install tap to capture audio
+        // CRITICAL: Always remove old tap first to prevent crashes
+        mixer.removeTap(onBus: 0)
+        
+        let format = mixer.outputFormat(forBus: 0)
+        guard format.sampleRate > 0 else { return }
+
         mixer.installTap(onBus: 0, bufferSize: bufferSize, format: format) { [weak self] buffer, time in
             self?.processBuffer(buffer)
         }
@@ -33,13 +35,11 @@ class GoniometerManager: ObservableObject {
         let channelCount = Int(buffer.format.channelCount)
         let frameLength = Int(buffer.frameLength)
         
-        // Get left and right channels
         let leftChannel = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
         let rightChannel = channelCount > 1 ?
             Array(UnsafeBufferPointer(start: channelData[1], count: frameLength)) : leftChannel
         
-        // Downsample for visualization (take every Nth sample)
-        let downsample = max(1, frameLength / 50)  // Get ~50 points
+        let downsample = max(1, frameLength / 50)
         var newLeftSamples: [Float] = []
         var newRightSamples: [Float] = []
         
@@ -48,14 +48,10 @@ class GoniometerManager: ObservableObject {
             newRightSamples.append(rightChannel[i])
         }
         
-        // Calculate phase correlation
         let correlation = calculatePhaseCorrelation(left: leftChannel, right: rightChannel)
         
-        // Update on main thread
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            
-            // Keep only last N points for trailing effect
             self.leftSamples = (self.leftSamples + newLeftSamples).suffix(self.maxPoints)
             self.rightSamples = (self.rightSamples + newRightSamples).suffix(self.maxPoints)
             self.phaseCorrelation = correlation

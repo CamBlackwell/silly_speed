@@ -2,7 +2,6 @@ import SwiftUI
 
 struct GoniometerView: View {
     @ObservedObject var manager: GoniometerManager
-    @ObservedObject private var motionManager = MotionManager()
 
     var body: some View {
         VStack(spacing: 10) {
@@ -97,7 +96,6 @@ struct GoniometerView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .offset(x: motionManager.roll * 500, y: motionManager.pitch * 500)
 
             phaseCorrelationMeter
         }
