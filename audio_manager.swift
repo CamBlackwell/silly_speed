@@ -12,7 +12,8 @@ class AudioManager: NSObject, ObservableObject {
     @Published var tempo: Float = 1.0
     @Published var pitch: Float = 0.0
     @Published var selectedAlgorithm: PitchAlgorithm = .apple
-    
+    @Published var goniometerManager = GoniometerManager()
+
 
     private var currentEngine: AudioEngineProtocol?
     private var timer: Timer?
@@ -108,6 +109,10 @@ class AudioManager: NSObject, ObservableObject {
         case .signalSmith:
             currentEngine = nil
         }
+        
+        if let avEngine = currentEngine?.getAudioEngine() {
+            goniometerManager.attach(to: avEngine)
+        }
     }
     
     func changeAlgorithm(to algorithm: PitchAlgorithm){
@@ -119,6 +124,10 @@ class AudioManager: NSObject, ObservableObject {
         let wasPlaying = isPlaying
         let currentAudioFile = audioFiles.first { $0.id == currentlyPlayingID }
         let savedTime = currentTime
+        
+        if let oldEngine = currentEngine?.getAudioEngine() {
+            goniometerManager.detach(from: oldEngine)
+        }
         
         stop()
         

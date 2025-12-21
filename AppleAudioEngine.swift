@@ -12,6 +12,10 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
         return playerNode.isPlaying
     }
     
+    func getAudioEngine() -> AVAudioEngine? {
+            return audioEngine
+    }
+    
     var currentTime: TimeInterval {
             guard let nodeTime = playerNode.lastRenderTime,
                   let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else {

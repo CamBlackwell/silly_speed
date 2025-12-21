@@ -27,6 +27,8 @@ struct AudioPlayerView: View {
                     
                     Spacer()
                     
+                    GoniometerView(manager: audioManager.goniometerManager)
+                    
                     Spacer()
 
                     tempoControl
