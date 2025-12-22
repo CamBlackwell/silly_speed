@@ -14,40 +14,51 @@ struct AudioPlayerView: View {
             Color(red: 0.15, green: 0.15, blue: 0.15)
                 .ignoresSafeArea()
             
-                VStack(spacing: 8) {
-                    
-                    Text(audioFile.fileName)
-                        .font(.title2)
-                        .fontDesign(.serif)
-                        .fontWeight(.heavy)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
+            VStack(spacing: 8) {
+                
+                Text(activeFile?.fileName ?? audioFile.fileName)
+                    .font(.title2)
+                    .fontDesign(.serif)
+                    .fontWeight(.heavy)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                
+                algorithmSelector
+                
+                Spacer()
+                
+                GoniometerView(manager: audioManager.goniometerManager)
+                
+                Spacer()
+                
+                tempoControl
+                
+                pitchControl
+                
+                timeSlider
+                
+                playbackControls
+                
+            }
+            .padding()
 
-                    algorithmSelector
-                    
-                    Spacer()
-                    
-                    GoniometerView(manager: audioManager.goniometerManager)
-                    
-                    Spacer()
-
-                    tempoControl
-                    
-                    pitchControl
-                    
-                    timeSlider
-                    
-                    playbackControls
-                    
-                }
-                .padding()
+            
         }
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
+        .onChange(of: audioManager.currentlyPlayingID) { oldID, newID in
+            if let newID = newID, newID != audioFile.id {
+                sliderValue = 0
+            }
+        }
+    }
+    
+    private var activeFile: AudioFile? {
+        audioManager.audioFiles.first(where: { $0.id == audioManager.currentlyPlayingID })
     }
     
     private var isThisFilePlaying: Bool {
-        audioManager.currentlyPlayingID == audioFile.id && audioManager.isPlaying
+        audioManager.isPlaying && audioManager.currentlyPlayingID != nil
     }
     
     private func formatTime(_ time: TimeInterval) -> String {
@@ -105,10 +116,10 @@ struct AudioPlayerView: View {
                 }
             )
             .tint(.red)
-            .disabled(audioManager.currentlyPlayingID != audioFile.id)
-            .onChange(of: audioManager.currentTime) {
+            .disabled(audioManager.currentlyPlayingID == nil)
+            .onChange(of: audioManager.currentTime) { oldTime, newTime in
                 if !isDragging {
-                    sliderValue = audioManager.currentTime
+                    sliderValue = newTime
                 }
             }
             HStack {
@@ -125,41 +136,56 @@ struct AudioPlayerView: View {
     }
     
     private var playbackControls: some View {
-        HStack(spacing: 40) {
-            Button(action: {}) {
-                Image(systemName: "backward.fill")
-                    .font(.title)
-                    .foregroundStyle(.secondary)
-            }
-            .disabled(true)
-            
-            Button(action: {
-                if audioManager.currentlyPlayingID == audioFile.id {
-                    audioManager.togglePlayPause()
-                } else {
-                    audioManager.play(audioFile: audioFile)
+        ZStack {
+            HStack(spacing: 40) {
+                Button(action: {}) {
+                    Image(systemName: "backward.fill")
+                        .font(.title)
+                        .foregroundStyle(.secondary)
                 }
-            }) {
-                ZStack {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 70, height: 70)
-                        //.glassEffect(.clear.tint(.red).interactive())
-                    
-                    Image(systemName: isThisFilePlaying ? "pause.fill" : "play.fill")
+                .disabled(true)
+                
+                Button(action: {
+                    if audioManager.currentlyPlayingID != nil {
+                        audioManager.togglePlayPause()
+                    } else {
+                        audioManager.play(audioFile: audioFile)
+                    }
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 70, height: 70)
+                        
+                        Image(systemName: isThisFilePlaying ? "pause.fill" : "play.fill")
+                            .font(.title)
+                            .foregroundStyle(.white)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Button(action: { audioManager.skipNextSong() }) {
+                    Image(systemName: "forward.fill")
                         .font(.title)
                         .foregroundStyle(.white)
                 }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(audioManager.audioFiles.count < 2)
             }
-            .buttonStyle(PlainButtonStyle())
-            .animation(.none, value: isThisFilePlaying)
             
-            Button(action: {}) {
-                Image(systemName: "forward.fill")
-                    .font(.title)
-                    .foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button(action: {
+                    audioManager.isLooping.toggle()
+                }) {
+                    Image(systemName: audioManager.isLooping ? "repeat.1" : "repeat")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(audioManager.isLooping ? .red : .secondary)
+                        .padding(10)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(PlainButtonStyle())
             }
-            .disabled(true)
         }
     }
     

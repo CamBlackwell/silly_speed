@@ -13,6 +13,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var pitch: Float = 0.0
     @Published var selectedAlgorithm: PitchAlgorithm = .apple
     @Published var goniometerManager = GoniometerManager()
+    @Published var isLooping: Bool = false
 
 
     private var currentEngine: AudioEngineProtocol?
@@ -300,9 +301,7 @@ class AudioManager: NSObject, ObservableObject {
     func play(audioFile: AudioFile) {
         let session = AVAudioSession.sharedInstance()
         do {
-            // 1. Ensure category is correct (in case it was changed by another app)
             try session.setCategory(.playback, mode: .default)
-            // 2. Activate
             try session.setActive(true)
         } catch {
             print("Could not activate session: \(error)")
@@ -310,6 +309,9 @@ class AudioManager: NSObject, ObservableObject {
         }
 
         guard let engine = currentEngine else { return }
+        
+        stopTimer()
+        self.currentTime = 0
 
         if currentlyPlayingID != audioFile.id {
             engine.stop()
@@ -322,8 +324,8 @@ class AudioManager: NSObject, ObservableObject {
         engine.play()
 
         isPlaying = true
-        currentlyPlayingID = audioFile.id
-        duration = TimeInterval(audioFile.audioDuration)
+        self.currentlyPlayingID = audioFile.id
+        self.duration = TimeInterval(audioFile.audioDuration)
         startTimer()
         updateNowPlayingInfo()
     }
@@ -392,8 +394,13 @@ class AudioManager: NSObject, ObservableObject {
                     return //if seeking dont update
                 }
                 
+                
                 self.currentTime = engine.currentTime
                 self.updateNowPlayingInfo()
+                
+                if self.currentTime >= self.duration && self.duration > 0 {
+                    self.skipNextSong()
+                }
             }
         }
 
@@ -401,6 +408,34 @@ class AudioManager: NSObject, ObservableObject {
     private func stopTimer(){
         timer?.invalidate()
         timer = nil
+    }
+    
+    func skipNextSong(){
+        stopTimer()
+        guard !audioFiles.isEmpty else {
+            stop()
+            return
+        }
+        if let currentIndex = audioFiles.firstIndex(where: { $0.id == currentlyPlayingID }) {
+            let nextIndex = currentIndex + 1
+            if nextIndex < audioFiles.count {
+                let nextFile = audioFiles[nextIndex]
+                play(audioFile: nextFile)
+            } else {
+                if isLooping {
+                    if let firstFile = audioFiles.first {
+                        play(audioFile: firstFile)
+                    }
+                } else {
+                    stop()
+                }
+            }
+        } else {
+            if let firstFile = audioFiles.first {
+                play(audioFile: firstFile)
+            }
+        }
+        
     }
     
 }

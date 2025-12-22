@@ -17,11 +17,9 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
     }
     
     var currentTime: TimeInterval {
-            guard let nodeTime = playerNode.lastRenderTime,
-                  let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else {
-                return seekOffset  // Return last known position
-            }
-            return seekOffset + (Double(playerTime.sampleTime) / playerTime.sampleRate)
+        guard let nodeTime = playerNode.lastRenderTime, let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else { return seekOffset }
+        let calculatedTime = seekOffset + (Double(playerTime.sampleTime) / playerTime.sampleRate)
+        return min(calculatedTime, duration)
     }
     
     var duration: TimeInterval {
