@@ -25,11 +25,17 @@ struct AudioPlayerView: View {
                 
                 algorithmSelector
                 
+                VStack(spacing: 20) {
+                    SpectrumView(manager: audioManager.spectrumManager)
+                        .frame(height: 100)
+                    
+                    GoniometerView(manager: audioManager.goniometerManager)
+                        .frame(height: 150)
+                }
+
+                
                 Spacer()
                 
-                GoniometerView(manager: audioManager.goniometerManager)
-                
-                Spacer()
                 
                 tempoControl
                 

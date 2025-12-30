@@ -14,6 +14,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var selectedAlgorithm: PitchAlgorithm = .apple
     @Published var goniometerManager = GoniometerManager()
     @Published var isLooping: Bool = false
+    @Published var spectrumManager = SpectrumManager()
 
 
     private var currentEngine: AudioEngineProtocol?
@@ -199,6 +200,7 @@ class AudioManager: NSObject, ObservableObject {
         
         if let avEngine = currentEngine?.getAudioEngine() {
             goniometerManager.attach(to: avEngine)
+            spectrumManager.attach(to: avEngine)
         }
     }
     func changeAlgorithm(to algorithm: PitchAlgorithm){
