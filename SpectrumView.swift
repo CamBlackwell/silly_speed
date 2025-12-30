@@ -3,101 +3,82 @@ import SwiftUI
 struct SpectrumView: View {
     @ObservedObject var analyzer: UnifiedAudioAnalyser
     
-    private let gradient = LinearGradient(
-        colors: [
-            Color(red: 1.0, green: 0.2, blue: 0.2),
-            Color(red: 1.0, green: 0.6, blue: 0.2),
-            Color(red: 1.0, green: 1.0, blue: 0.3),
-            Color(red: 0.3, green: 1.0, blue: 0.3),
-            Color(red: 0.3, green: 0.6, blue: 1.0),
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
-    
+    private let barGradient = Gradient(colors: [
+        Color(red: 1.0, green: 0.2, blue: 0.2),
+        Color(red: 1.0, green: 0.6, blue: 0.2),
+        Color(red: 1.0, green: 1.0, blue: 0.3),
+        Color(red: 0.3, green: 1.0, blue: 0.3),
+        Color(red: 0.3, green: 0.6, blue: 1.0)
+    ])
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             GeometryReader { geo in
-                Canvas { context, size in
-                    let barCount = analyzer.spectrumBands.count
-                    let barWidth = size.width / CGFloat(barCount)
-                    let spacing: CGFloat = 1
-                    
-                    for i in 0..<barCount {
-                        let amplitude = CGFloat(analyzer.spectrumBands[i])
-                        let peak = CGFloat(analyzer.peakHolds[i])
-                        let barHeight = amplitude * size.height
-                        let peakY = size.height - (peak * size.height)
+                ZStack {
+                    Canvas { context, size in
+                        let dbLevels: [Float] = [-20, -40, -60]
+                        let dbFloor: Float = -65.0
+                        let dbRange: Float = 60.0
                         
-                        let x = CGFloat(i) * barWidth
-                        
-                        let barRect = CGRect(
-                            x: x + spacing / 2,
-                            y: size.height - barHeight,
-                            width: barWidth - spacing,
-                            height: barHeight
-                        )
-                        
-                        let barPath = RoundedRectangle(cornerRadius: 1)
-                            .path(in: barRect)
-                        
-                        let colorPosition = CGFloat(i) / CGFloat(barCount)
-                        let barColor = gradientColor(at: colorPosition)
-                        
-                        context.fill(barPath, with: .color(barColor.opacity(0.9)))
-                        context.fill(barPath, with: .color(barColor.opacity(0.3)))
-                        
-                        if peak > 0.05 {
-                            let peakRect = CGRect(
-                                x: x + spacing / 2,
-                                y: peakY - 1,
-                                width: barWidth - spacing,
-                                height: 2
-                            )
-                            context.fill(
-                                Path(roundedRect: peakRect, cornerRadius: 1),
-                                with: .color(.white.opacity(0.9))
-                            )
+                        for level in dbLevels {
+                            let y = size.height - CGFloat((level - dbFloor) / dbRange) * size.height
+                            var path = Path()
+                            path.move(to: CGPoint(x: 0, y: y))
+                            path.addLine(to: CGPoint(x: size.width, y: y))
+                            
+                            context.stroke(path, with: .color(.white.opacity(0.15)), lineWidth: 1)
+                            context.draw(Text("\(Int(level))dB").font(.system(size: 8)), at: CGPoint(x: 20, y: y - 8))
                         }
                     }
-                    
-                    let labels = ["20Hz", "100Hz", "1kHz", "10kHz", "20kHz"]
-                    let positions: [CGFloat] = [0.0, 0.15, 0.5, 0.85, 1.0]
-                    
-                    for (label, position) in zip(labels, positions) {
-                        let x = position * size.width
-                        let point = CGPoint(x: x, y: size.height + 12)
-                        context.draw(
-                            Text(label)
-                                .font(.system(size: 8, weight: .medium, design: .monospaced))
-                                .foregroundStyle(.secondary),
-                            at: point
-                        )
+
+                    Canvas { context, size in
+                        let barCount = analyzer.spectrumBands.count
+                        let barWidth = size.width / CGFloat(barCount)
+                        
+                        for i in 0..<barCount {
+                            let amplitude = CGFloat(analyzer.spectrumBands[i])
+                            let barHeight = amplitude * size.height
+                            let x = CGFloat(i) * barWidth
+                            
+                            let barRect = CGRect(x: x + 0.5, y: size.height - barHeight, width: barWidth - 1, height: barHeight)
+                            
+                            context.fill(
+                                Path(barRect),
+                                with: GraphicsContext.Shading.linearGradient(
+                                    barGradient,
+                                    startPoint: CGPoint(x: 0, y: size.height),
+                                    endPoint: CGPoint(x: 0, y: 0)
+                                )
+                            )
+                            
+                            let peak = CGFloat(analyzer.peakHolds[i])
+                            let peakY = size.height - (peak * size.height)
+                            let peakRect = CGRect(x: x + 0.5, y: peakY, width: barWidth - 1, height: 1)
+                            context.fill(Path(peakRect), with: .color(.white.opacity(0.8)))
+                        }
+                    }
+
+                    Canvas { context, size in
+                        let freqs: [Float] = [100, 1000, 5000, 10000]
+                        for f in freqs {
+                            let xPercentage = log10(f / 20.0) / log10(20000.0 / 20.0)
+                            let x = CGFloat(xPercentage) * size.width
+                            
+                            var path = Path()
+                            path.move(to: CGPoint(x: x, y: 0))
+                            path.addLine(to: CGPoint(x: x, y: size.height))
+                            context.stroke(path, with: .color(.white.opacity(0.1)), lineWidth: 1)
+                            
+                            let label = f >= 1000 ? "\(Int(f/1000))kHz" : "\(Int(f))Hz"
+                            context.draw(Text(label).font(.system(size: 8)).bold(), at: CGPoint(x: x, y: size.height - 10))
+                        }
                     }
                 }
             }
-            .frame(height: 120)
-            .background(Color.black.opacity(0.3))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .frame(height: 160)
+            .background(Color.black.opacity(0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(.white.opacity(0.1), lineWidth: 1))
         }
         .padding(.horizontal)
-    }
-    
-    private func gradientColor(at position: CGFloat) -> Color {
-        let colors: [Color] = [
-            Color(red: 1.0, green: 0.2, blue: 0.2),
-            Color(red: 1.0, green: 0.6, blue: 0.2),
-            Color(red: 1.0, green: 1.0, blue: 0.3),
-            Color(red: 0.3, green: 1.0, blue: 0.3),
-            Color(red: 0.3, green: 0.6, blue: 1.0),
-        ]
-        
-        let scaledPosition = position * CGFloat(colors.count - 1)
-        let index = Int(scaledPosition)
-        let fraction = scaledPosition - CGFloat(index)
-        
-        guard index < colors.count - 1 else { return colors.last! }
-        
-        return colors[index]
     }
 }
