@@ -4,7 +4,6 @@ struct AudioPlayerView: View {
     let audioFile: AudioFile
     @ObservedObject var audioManager: AudioManager
     @State private var volume: Float = 1.0
-    @State var color: Color = .blue
     @State private var isScrubbing: Bool = false
     @State private var sliderValue: Double = 0
     @State private var isDragging = false
@@ -15,7 +14,6 @@ struct AudioPlayerView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 8) {
-                
                 Text(activeFile?.fileName ?? audioFile.fileName)
                     .font(.title2)
                     .fontDesign(.serif)
@@ -23,32 +21,21 @@ struct AudioPlayerView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                 
-                algorithmSelector
-                
-                VStack(spacing: 20) {
-                    SpectrumView(manager: audioManager.spectrumManager)
-                        .frame(height: 100)
-                    
-                    GoniometerView(manager: audioManager.goniometerManager)
-                        .frame(height: 150)
+                HStack {
+                    algorithmSelector
+                    visualizationSelector
                 }
-
+                
+                visualizationView
                 
                 Spacer()
                 
-                
                 tempoControl
-                
                 pitchControl
-                
                 timeSlider
-                
                 playbackControls
-                
             }
             .padding()
-
-            
         }
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
@@ -56,6 +43,65 @@ struct AudioPlayerView: View {
             if let newID = newID, newID != audioFile.id {
                 sliderValue = 0
             }
+        }
+    }
+    
+    // MARK: - Visualization Selector
+    private var visualizationSelector: some View {
+        Menu {
+            ForEach(VisualizationMode.allCases, id: \.self) { mode in
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        audioManager.visualizationMode = mode
+                        audioManager.saveVisualizationMode()
+                    }
+                }) {
+                    HStack {
+                        Label(mode.rawValue, systemImage: mode.icon)
+                        Spacer()
+                        if audioManager.visualizationMode == mode {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack {
+                Image(systemName: audioManager.visualizationMode.icon)
+                    .font(.subheadline)
+                    .tint(.white)
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+                    .tint(.white)
+            }
+            .padding()
+        }
+    }
+    
+    // MARK: - Dynamic Visualization View
+    @ViewBuilder
+    private var visualizationView: some View {
+        switch audioManager.visualizationMode {
+        case .both:
+            VStack(spacing: 20) {
+                SpectrumView(analyzer: audioManager.audioAnalyzer)
+                    .frame(height: 140)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                
+                GoniometerView(analyzer: audioManager.audioAnalyzer)
+                    .frame(height: 150)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            
+        case .spectrumOnly:
+            SpectrumView(analyzer: audioManager.audioAnalyzer)
+                .frame(maxHeight: .infinity)
+                .transition(.scale.combined(with: .opacity))
+            
+        case .goniometerOnly:
+            GoniometerView(analyzer: audioManager.audioAnalyzer)
+                .frame(maxHeight: .infinity)
+                .transition(.scale.combined(with: .opacity))
         }
     }
     
@@ -100,14 +146,8 @@ struct AudioPlayerView: View {
                     .tint(.white)
             }
             .padding()
-            .glassEffect(.clear)
-            //.background(Color.white.opacity(0.1))
-            //.cornerRadius(12)
         }
-        .padding(.horizontal)
     }
-
-
 
     private var timeSlider: some View {
         VStack(spacing: 8) {
@@ -268,56 +308,25 @@ struct AudioPlayerView: View {
         .padding(.horizontal)
     }
     
-    private var volumeControl: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Image(systemName: "speaker.fill")
-                    .foregroundStyle(.secondary)
-                
-                Slider(value: $volume, in: 0...1)
-                    .onChange(of: volume) {
-                        audioManager.setVolume(volume)
-                    }
-                    .tint(.red)
-                
-                Image(systemName: "speaker.wave.3.fill")
-                    .foregroundStyle(.secondary)
-            }
+    private var resetTempoButton: some View {
+        Button(action: {
+            audioManager.setTempo(1.0)
+        }) {
+            Image(systemName: "arrow.counterclockwise")
+                .font(.subheadline)
+                .foregroundStyle(.red)
         }
         .padding(.horizontal)
     }
     
-    private var resetTempoButton: some View {
-        HStack {
-            Button(action: {
-                audioManager.setTempo(1.0)
-                
-            }) {
-                HStack {
-                    Image(systemName: "arrow.counterclockwise")
-                    //Text("Reset Speed")
-                }
-                .font(.subheadline)
-                .foregroundStyle(.red)
-            }
-            .padding(.horizontal)
-        }
-    }
-    
     private var resetPitchButton: some View {
-        HStack {
-            Button(action: {
-                audioManager.setPitch(1.0)
-                
-            }) {
-                HStack {
-                    Image(systemName: "arrow.counterclockwise")
-                    //Text("Reset Pitch")
-                }
+        Button(action: {
+            audioManager.setPitch(0.0)
+        }) {
+            Image(systemName: "arrow.counterclockwise")
                 .font(.subheadline)
                 .foregroundStyle(.red)
-            }
-            .padding(.horizontal)
         }
+        .padding(.horizontal)
     }
 }

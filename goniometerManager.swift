@@ -14,9 +14,7 @@ class GoniometerManager: ObservableObject {
     func attach(to audioEngine: AVAudioEngine) {
         let mixer = audioEngine.mainMixerNode
         
-        // CRITICAL: Always remove old tap first to prevent crashes
         mixer.removeTap(onBus: 0)
-        
         let format = mixer.outputFormat(forBus: 0)
         guard format.sampleRate > 0 else { return }
 

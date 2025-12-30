@@ -12,16 +12,16 @@ class AudioManager: NSObject, ObservableObject {
     @Published var tempo: Float = 1.0
     @Published var pitch: Float = 0.0
     @Published var selectedAlgorithm: PitchAlgorithm = .apple
-    @Published var goniometerManager = GoniometerManager()
+    @Published var audioAnalyzer = UnifiedAudioAnalyser()
     @Published var isLooping: Bool = false
-    @Published var spectrumManager = SpectrumManager()
-
+    @Published var visualizationMode: VisualizationMode = .both
 
     private var currentEngine: AudioEngineProtocol?
     private var timer: Timer?
     private let fileDirectory: URL
     private let audioFilesKey = "savedAudioFiles"
     private let algorithmKey = "selectedAlgorithm"
+    private let visualizationModeKey = "visualizationMode"
     private var isSeeking = false
 
     override init() {
@@ -29,11 +29,25 @@ class AudioManager: NSObject, ObservableObject {
         super.init()
         loadAudioFiles()
         loadSelectedAlgorithm()
+        loadVisualizationMode()  // Add this
         setupAudioSession()
         initialiseEngine()
         setupInterruptionObserver()
         setupRouteChangeObserver()
         setupConfigurationChangeObserver()
+    }
+    
+    // Add this function
+    private func loadVisualizationMode() {
+        if let saved = UserDefaults.standard.string(forKey: visualizationModeKey),
+           let mode = VisualizationMode(rawValue: saved) {
+            visualizationMode = mode
+        }
+    }
+    
+    // Add this function
+    func saveVisualizationMode() {
+        UserDefaults.standard.set(visualizationMode.rawValue, forKey: visualizationModeKey)
     }
     
     private func setupConfigurationChangeObserver() {
@@ -73,7 +87,7 @@ class AudioManager: NSObject, ObservableObject {
             try audioSession.setCategory(.playback, mode: .default)
             try audioSession.setActive(true)
             UIApplication.shared.beginReceivingRemoteControlEvents()
-                    setupRemoteTransportControls()
+            setupRemoteTransportControls()
         } catch {
             print("failed to set up audio \(error.localizedDescription)")
         }
@@ -92,18 +106,18 @@ class AudioManager: NSObject, ObservableObject {
         }
         
         commandCenter.previousTrackCommand.isEnabled = true
-            commandCenter.previousTrackCommand.addTarget { [weak self] event in
-                guard let self = self else { return .commandFailed }
-                self.skipPreviousSong()
-                return .success
-            }
+        commandCenter.previousTrackCommand.addTarget { [weak self] event in
+            guard let self = self else { return .commandFailed }
+            self.skipPreviousSong()
+            return .success
+        }
         
         commandCenter.nextTrackCommand.isEnabled = true
-            commandCenter.nextTrackCommand.addTarget { [weak self] event in
-                guard let self = self else { return .commandFailed }
-                self.skipNextSong() // Calls your existing logic
-                return .success
-            }
+        commandCenter.nextTrackCommand.addTarget { [weak self] event in
+            guard let self = self else { return .commandFailed }
+            self.skipNextSong()
+            return .success
+        }
         
         commandCenter.pauseCommand.addTarget { [weak self] event in
             self?.togglePlayPause()
@@ -164,7 +178,7 @@ class AudioManager: NSObject, ObservableObject {
                   let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
                   let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
 
-            if reason == .oldDeviceUnavailable { //headphones were disconnected
+            if reason == .oldDeviceUnavailable {
                 DispatchQueue.main.async {
                     self?.togglePlayPause()
                 }
@@ -189,7 +203,7 @@ class AudioManager: NSObject, ObservableObject {
     private func initialiseEngine(){
         switch selectedAlgorithm {
         case .apple:
-            currentEngine = AppleAudioEngine() //TODO ADD engines
+            currentEngine = AppleAudioEngine()
         case .rubberBand:
             currentEngine = nil
         case .soundTouch:
@@ -199,10 +213,10 @@ class AudioManager: NSObject, ObservableObject {
         }
         
         if let avEngine = currentEngine?.getAudioEngine() {
-            goniometerManager.attach(to: avEngine)
-            spectrumManager.attach(to: avEngine)
+            audioAnalyzer.attach(to: avEngine)
         }
     }
+    
     func changeAlgorithm(to algorithm: PitchAlgorithm){
         guard algorithm.isImplemented else {
             print ("Algorithm \(algorithm.rawValue) not implemented yet")
@@ -214,7 +228,7 @@ class AudioManager: NSObject, ObservableObject {
         let savedTime = currentTime
         
         if let oldEngine = currentEngine?.getAudioEngine() {
-            goniometerManager.detach(from: oldEngine)
+            audioAnalyzer.detach(from: oldEngine)
         }
         
         stop()
@@ -260,20 +274,18 @@ class AudioManager: NSObject, ObservableObject {
                     let duration = try await asset.load(.duration)
                     let durationInSeconds = Float(CMTimeGetSeconds(duration))
                     
-                    
                     let audioFile = AudioFile(fileName: fileName, fileURL: destinationURL, audioDuration: durationInSeconds)
                     await MainActor.run {
                         audioFiles.append(audioFile)
                         saveAudioFiles()
                     }
-            } catch {
-                print("failed to load duration \(error)")
+                } catch {
+                    print("failed to load duration \(error)")
+                }
             }
-        }
         } catch {
             print("failed to import file \(error.localizedDescription)")
         }
-
     }
 
     func deleteAudioFile(_ audioFile: AudioFile){
@@ -307,11 +319,7 @@ class AudioManager: NSObject, ObservableObject {
         } catch {
             print("failed to load Audio Files \(error.localizedDescription)")
         }
-
     }
-    
-
-
 
     func play(audioFile: AudioFile) {
         let session = AVAudioSession.sharedInstance()
@@ -376,14 +384,14 @@ class AudioManager: NSObject, ObservableObject {
     }
 
     func seek(to time: TimeInterval){
-            isSeeking = true
-            currentEngine?.seek(to: time)
-            currentTime = time
+        isSeeking = true
+        currentEngine?.seek(to: time)
+        currentTime = time
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.isSeeking = false
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.isSeeking = false
         }
+    }
 
     func setVolume(_ volume: Float){
         currentEngine?.setVolume(volume)
@@ -398,28 +406,25 @@ class AudioManager: NSObject, ObservableObject {
         pitch = max(-2400, min(2400, newPitch))
         currentEngine?.setPitch(pitch)
     }
-    
-
 
     private func startTimer(){
-            timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                guard let self = self, let engine = self.currentEngine else { return }
-                
-                if self.isSeeking { return } //if seeking dont update
-                
-                let engineTime = engine.currentTime
-                
-                DispatchQueue.main.async {
-                    self.currentTime = engineTime
-                    self.updateNowPlayingInfo()
-                }
-                
-                if self.currentTime >= self.duration && self.duration > 0 {
-                    self.skipNextSong()
-                }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self = self, let engine = self.currentEngine else { return }
+            
+            if self.isSeeking { return }
+            
+            let engineTime = engine.currentTime
+            
+            DispatchQueue.main.async {
+                self.currentTime = engineTime
+                self.updateNowPlayingInfo()
+            }
+            
+            if self.currentTime >= self.duration && self.duration > 0 {
+                self.skipNextSong()
             }
         }
-
+    }
 
     private func stopTimer(){
         timer?.invalidate()
@@ -453,19 +458,19 @@ class AudioManager: NSObject, ObservableObject {
         }
         
         if timer == nil {
-                startTimer()
+            startTimer()
         }
         self.currentTime = 0
         updateNowPlayingInfo()
     }
     
-   func skipNextSong(){
+    func skipNextSong(){
         stopTimer()
         guard !audioFiles.isEmpty else {
             stop()
             return
         }
-       
+        
         if let currentIndex = audioFiles.firstIndex(where: { $0.id == currentlyPlayingID }) {
             let nextIndex = currentIndex + 1
             if nextIndex < audioFiles.count {
@@ -485,10 +490,9 @@ class AudioManager: NSObject, ObservableObject {
                 play(audioFile: firstFile)
             }
         }
-        
     }
-    
 }
+
 extension AudioManager: AVAudioPlayerDelegate{
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool){
         isPlaying = false
@@ -497,4 +501,3 @@ extension AudioManager: AVAudioPlayerDelegate{
         stopTimer()
     }
 }
-

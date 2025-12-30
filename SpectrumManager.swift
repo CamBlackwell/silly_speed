@@ -33,8 +33,6 @@ class SpectrumManager: ObservableObject {
         var newAmplitudes: [Float] = []
         var newPeaks: [Float] = []
         
-        // We use a logarithmic approach to binning so the Bass frequencies
-        // aren't all crammed into the first two bars.
         for i in 0..<binCount {
             let fractionalIndex = Float(i) / Float(binCount)
             // Logarithmic mapping
