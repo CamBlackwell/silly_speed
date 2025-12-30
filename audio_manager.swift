@@ -90,6 +90,20 @@ class AudioManager: NSObject, ObservableObject {
             return .commandFailed
         }
         
+        commandCenter.previousTrackCommand.isEnabled = true
+            commandCenter.previousTrackCommand.addTarget { [weak self] event in
+                guard let self = self else { return .commandFailed }
+                self.skipPreviousSong()
+                return .success
+            }
+        
+        commandCenter.nextTrackCommand.isEnabled = true
+            commandCenter.nextTrackCommand.addTarget { [weak self] event in
+                guard let self = self else { return .commandFailed }
+                self.skipNextSong() // Calls your existing logic
+                return .success
+            }
+        
         commandCenter.pauseCommand.addTarget { [weak self] event in
             self?.togglePlayPause()
             return .success

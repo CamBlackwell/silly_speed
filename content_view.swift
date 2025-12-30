@@ -324,15 +324,11 @@ struct MiniPlayerBar: View {
                         Spacer()
                         
                         HStack(spacing: 20) {
-                            Button {
-                                // Skip backward (disabled for now)
-                            } label: {
+                            Button(action: { audioManager.skipPreviousSong()}) {
                                 Image(systemName: "backward.fill")
-                                    .font(.title3)
+                                    .font(.title)
                                     .foregroundStyle(.secondary)
                             }
-                            .disabled(true)
-                            .buttonStyle(PlainButtonStyle())
                             
                             Button {
                                 audioManager.togglePlayPause()
@@ -343,15 +339,13 @@ struct MiniPlayerBar: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             
-                            Button {
-                                // Skip forward (disabled for now)
-                            } label: {
+                            Button(action: { audioManager.skipNextSong() }) {
                                 Image(systemName: "forward.fill")
-                                    .font(.title3)
+                                    .font(.title)
                                     .foregroundStyle(.secondary)
                             }
-                            .disabled(true)
                             .buttonStyle(PlainButtonStyle())
+                            .disabled(audioManager.audioFiles.count < 2)
                         }
                     }
                     .padding(.horizontal, 16)
