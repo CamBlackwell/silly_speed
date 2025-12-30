@@ -187,7 +187,6 @@ class AudioManager: NSObject, ObservableObject {
             goniometerManager.attach(to: avEngine)
         }
     }
-    
     func changeAlgorithm(to algorithm: PitchAlgorithm){
         guard algorithm.isImplemented else {
             print ("Algorithm \(algorithm.rawValue) not implemented yet")
@@ -390,13 +389,14 @@ class AudioManager: NSObject, ObservableObject {
             timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
                 guard let self = self, let engine = self.currentEngine else { return }
                 
-                if self.isSeeking {
-                    return //if seeking dont update
+                if self.isSeeking { return } //if seeking dont update
+                
+                let engineTime = engine.currentTime
+                
+                DispatchQueue.main.async {
+                    self.currentTime = engineTime
+                    self.updateNowPlayingInfo()
                 }
-                
-                
-                self.currentTime = engine.currentTime
-                self.updateNowPlayingInfo()
                 
                 if self.currentTime >= self.duration && self.duration > 0 {
                     self.skipNextSong()
@@ -410,12 +410,46 @@ class AudioManager: NSObject, ObservableObject {
         timer = nil
     }
     
-    func skipNextSong(){
+    func skipPreviousSong() {
+        if currentTime > 3.0 {
+            restartCurrentSong()
+            return
+        }
+        stopTimer()
+        guard let currentIndex = audioFiles.firstIndex(where: { $0.id == currentlyPlayingID }) else {
+            return
+        }
+        
+        let previousIndex = currentIndex - 1
+        if previousIndex >= 0 {
+            play(audioFile: audioFiles[previousIndex])
+        } else {
+            restartCurrentSong()
+        }
+    }
+    
+    private func restartCurrentSong(){
+        seek(to: 0)
+        
+        if !isPlaying {
+            currentEngine?.play()
+            isPlaying = true
+        }
+        
+        if timer == nil {
+                startTimer()
+        }
+        self.currentTime = 0
+        updateNowPlayingInfo()
+    }
+    
+   func skipNextSong(){
         stopTimer()
         guard !audioFiles.isEmpty else {
             stop()
             return
         }
+       
         if let currentIndex = audioFiles.firstIndex(where: { $0.id == currentlyPlayingID }) {
             let nextIndex = currentIndex + 1
             if nextIndex < audioFiles.count {

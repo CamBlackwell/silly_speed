@@ -138,12 +138,11 @@ struct AudioPlayerView: View {
     private var playbackControls: some View {
         ZStack {
             HStack(spacing: 40) {
-                Button(action: {}) {
+                Button(action: { audioManager.skipPreviousSong()}) {
                     Image(systemName: "backward.fill")
                         .font(.title)
                         .foregroundStyle(.secondary)
                 }
-                .disabled(true)
                 
                 Button(action: {
                     if audioManager.currentlyPlayingID != nil {
@@ -167,7 +166,7 @@ struct AudioPlayerView: View {
                 Button(action: { audioManager.skipNextSong() }) {
                     Image(systemName: "forward.fill")
                         .font(.title)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .disabled(audioManager.audioFiles.count < 2)
