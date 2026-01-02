@@ -6,22 +6,54 @@ struct ContentView: View {
     @State private var showingFilePicker = false
     @State private var navigateToPlayer = false
     @State private var selectedAudioFile: AudioFile?
+    
+    @State private var libraryFilter: LibraryFilter = .all
+    @State private var showingCreatePlaylistAlert = false
+    @State private var newPlaylistName = ""
 
     var body: some View {
-        NavigationStack{
-            ZStack{
+        NavigationStack {
+            ZStack {
                 Color(red: 0.15, green: 0.15, blue: 0.15)
-                                    .ignoresSafeArea()
+                    .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    if audioManager.audioFiles.isEmpty {
+                    HStack {
+                        Menu {
+                            Picker("Filter", selection: $libraryFilter) {
+                                ForEach(LibraryFilter.allCases, id: \.self) { filter in
+                                    Text(filter.rawValue).tag(filter)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(libraryFilter.rawValue)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.white)
+                                Image(systemName: "chevron.down")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.red)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Capsule())
+                        }
+                        .padding(.leading)
+                        .padding(.top, 10)
+                        
+                        Spacer()
+                    }
+                    
+                    if audioManager.audioFiles.isEmpty && audioManager.playlists.isEmpty {
                         EmptyStateView()
                     } else {
-                        AudioFilesList(
+                        MixedLibraryList(
                             audioManager: audioManager,
+                            filter: libraryFilter,
                             navigateToPlayer: $navigateToPlayer,
-                            selectedAudioFile: $selectedAudioFile,
-                            onDelete: deleteFiles
+                            selectedAudioFile: $selectedAudioFile
                         )
                     }
                     
@@ -35,16 +67,28 @@ struct ContentView: View {
                 }
                 
                 VStack {
+                    Spacer()
                     HStack {
                         Spacer()
-                        Button(action: { showingFilePicker = true }) {
+                        Menu {
+                            Button {
+                                showingFilePicker = true
+                            } label: {
+                                Label("Add Songs", systemImage: "music.note.list")
+                            }
+                            Button {
+                                newPlaylistName = ""
+                                showingCreatePlaylistAlert = true
+                            } label: {
+                                Label("Create Playlist", systemImage: "text.badge.plus")
+                            }
+                        } label: {
                             ZStack {
                                 Circle()
                                     .fill(.ultraThinMaterial)
                                     .opacity(0.50)
                                     .frame(width: 60, height: 60)
                                     .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-                                    .glassEffect()
                                 
                                 Image(systemName: "plus")
                                     .font(.system(size: 24, weight: .semibold))
@@ -52,20 +96,167 @@ struct ContentView: View {
                             }
                         }
                         .padding(.trailing, 20)
-                        .padding(.top, 20)
+                        .padding(.bottom, audioManager.currentlyPlayingID != nil ? 90 : 20)
                     }
-                    Spacer()
                 }
             }
             .sheet(isPresented: $showingFilePicker) {
                 DocumentPicker(audioManager: audioManager)
             }
+            .alert("New Playlist", isPresented: $showingCreatePlaylistAlert) {
+                TextField("Playlist Name", text: $newPlaylistName)
+                Button("Cancel", role: .cancel) { }
+                Button("Create") {
+                    if !newPlaylistName.isEmpty {
+                        audioManager.createPlaylist(name: newPlaylistName)
+                    }
+                }
+            }
+            .navigationDestination(isPresented: $navigateToPlayer) {
+                 if let audioFile = selectedAudioFile {
+                     AudioPlayerView(audioFile: audioFile, audioManager: audioManager)
+                 }
+            }
         }
         .tint(.red)
     }
-    private func deleteFiles(at offsets: IndexSet) {
-        for index in offsets {
-            audioManager.deleteAudioFile(audioManager.audioFiles[index])
+}
+
+struct MixedLibraryList: View {
+    @ObservedObject var audioManager: AudioManager
+    let filter: LibraryFilter
+    @Binding var navigateToPlayer: Bool
+    @Binding var selectedAudioFile: AudioFile?
+    
+    @State private var expandedPlaylists: Set<UUID> = []
+    
+    var mixedList: [LibraryItem] {
+        var items: [LibraryItem] = []
+        if filter == .all || filter == .songs {
+            items.append(contentsOf: audioManager.audioFiles.map { .song($0) })
+        }
+        if filter == .all || filter == .playlists {
+            items.append(contentsOf: audioManager.playlists.map { .playlist($0) })
+        }
+        return items.sorted { $0.dateAdded > $1.dateAdded }
+    }
+    
+    var body: some View {
+        List {
+            ForEach(mixedList) { item in
+                switch item {
+                case .song(let audioFile):
+                    AudioFileButton(
+                        audioFile: audioFile,
+                        audioManager: audioManager,
+                        navigateToPlayer: $navigateToPlayer,
+                        selectedAudioFile: $selectedAudioFile
+                    )
+                    .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
+                    .listRowSeparator(.hidden)
+
+                case .playlist(let playlist):
+                    PlaylistAccordionRow(
+                        playlist: playlist,
+                        isExpanded: expandedPlaylists.contains(playlist.id),
+                        audioManager: audioManager,
+                        navigateToPlayer: $navigateToPlayer,
+                        selectedAudioFile: $selectedAudioFile,
+                        toggleExpansion: {
+                            if expandedPlaylists.contains(playlist.id) {
+                                expandedPlaylists.remove(playlist.id)
+                            } else {
+                                expandedPlaylists.insert(playlist.id)
+                            }
+                        }
+                    )
+                    .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
+                    .listRowSeparator(.hidden)
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            audioManager.deletePlaylist(playlist)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+    }
+}
+
+struct PlaylistAccordionRow: View {
+    let playlist: Playlist
+    let isExpanded: Bool
+    @ObservedObject var audioManager: AudioManager
+    @Binding var navigateToPlayer: Bool
+    @Binding var selectedAudioFile: AudioFile?
+    let toggleExpansion: () -> Void
+    
+    var playlistSongs: [AudioFile] {
+        audioManager.getAudioFiles(for: playlist)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: { withAnimation(.spring()) { toggleExpansion() } }) {
+                HStack {
+                    Image(systemName: "music.note.list")
+                        .font(.title2)
+                        .foregroundStyle(.red)
+                        .frame(width: 30)
+                    
+                    VStack(alignment: .leading) {
+                        Text(playlist.name)
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Text("\(playlistSongs.count) songs")
+                            .font(.caption)
+                            .foregroundStyle(.gray)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(.gray)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            
+            if isExpanded {
+                if playlistSongs.isEmpty {
+                    Text("No songs. Long press songs in main list to add.")
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                        .padding(.leading, 40)
+                        .padding(.bottom, 8)
+                } else {
+                    ForEach(playlistSongs) { file in
+                        AudioFileButton(
+                            audioFile: file,
+                            audioManager: audioManager,
+                            navigateToPlayer: $navigateToPlayer,
+                            selectedAudioFile: $selectedAudioFile,
+                            context: playlistSongs
+                        )
+                        .padding(.leading, 20)
+                        .padding(.vertical, 4)
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                audioManager.removeAudioFile(file, from: playlist)
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -76,44 +267,16 @@ struct EmptyStateView: View {
             Image(systemName: "moon.zzz.fill")
                 .font(.system(size: 60))
                 .foregroundStyle(.red.opacity(0.8))
-            
+           
             Text("No audio Files .·°՞(¯□¯)՞°·.")
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundStyle(.red.opacity(0.8))
-            
+           
             Text("press the + to add files")
                 .foregroundStyle(.red.opacity(0.8))
         }
-    }
-}
-
-struct AudioFilesList: View {
-    @ObservedObject var audioManager: AudioManager
-    @Binding var navigateToPlayer: Bool
-    @Binding var selectedAudioFile: AudioFile?
-    let onDelete: (IndexSet) -> Void
-    
-    var body: some View {
-        List {
-            ForEach(audioManager.audioFiles) { audioFile in
-                AudioFileButton(
-                    audioFile: audioFile,
-                    audioManager: audioManager,
-                    navigateToPlayer: $navigateToPlayer,
-                    selectedAudioFile: $selectedAudioFile
-                )
-            }
-            .onDelete(perform: onDelete)
-            .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
-        }
-        .navigationDestination(isPresented: $navigateToPlayer) {
-            if let audioFile = selectedAudioFile {
-                AudioPlayerView(audioFile: audioFile, audioManager: audioManager)
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .frame(maxHeight: .infinity)
     }
 }
 
@@ -123,13 +286,15 @@ struct AudioFileButton: View {
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
     
+    var context: [AudioFile]? = nil
+    
     var body: some View {
         Button {
             if audioManager.currentlyPlayingID == audioFile.id {
                 selectedAudioFile = audioFile
                 navigateToPlayer = true
             } else {
-                audioManager.play(audioFile: audioFile)
+                audioManager.play(audioFile: audioFile, context: context)
             }
         } label: {
             AudioFileRow(
@@ -151,42 +316,21 @@ struct AudioFileContextMenu: View {
     var body: some View {
         Button("share this file", systemImage: "square.and.arrow.up") {}
         Button("rename", systemImage: "pencil.and.outline") {}
+        
+        Menu {
+            ForEach(audioManager.playlists) { playlist in
+                Button(playlist.name) {
+                    audioManager.addAudioFile(audioFile, to: playlist)
+                }
+            }
+        } label: {
+            Label("Add to Playlist", systemImage: "plus")
+        }
+
         Button(role: .destructive) {
             audioManager.deleteAudioFile(audioFile)
         } label: {
             Label("Delete via Menu", systemImage: "trash")
-        }
-    }
-}
-
-struct BottomPlayerControls: View {
-    @ObservedObject var audioManager: AudioManager
-    
-    var body: some View {
-        if audioManager.currentlyPlayingID != nil {
-            Button(action: {}) {
-                Image(systemName: "backward.fill")
-                    .font(.title)
-                    .foregroundStyle(.secondary)
-            }
-            .disabled(true)
-            
-            Spacer()
-            
-            Button {
-                audioManager.togglePlayPause()
-            } label: {
-                Image(systemName: audioManager.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-            }
-            
-            Spacer()
-            
-            Button(action: {}) {
-                Image(systemName: "pencil.and.outline")
-                    .font(.title)
-                    .foregroundStyle(.secondary)
-            }
-            .disabled(true)
         }
     }
 }
@@ -205,7 +349,6 @@ struct AudioFileRow: View {
                 Text(audioFile.fileName)
                     .font(.headline)
                     .foregroundStyle(isCurrentlyPlaying ? .red : .gray)
-
                 
                 HStack{
                     Text(audioFile.dateAdded, style: .date)
@@ -299,7 +442,7 @@ struct MiniPlayerBar: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer()
-                                
+                                 
                                 Text(formatTime(audioFile.audioDuration))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -309,7 +452,7 @@ struct MiniPlayerBar: View {
                                     Rectangle()
                                         .fill(Color.gray.opacity(0.3))
                                         .frame(height: 3)
-                                    
+                                     
                                     Rectangle()
                                         .fill(Color.red)
                                         .frame(width: geometry.size.width * progressPercentage, height: 3)
@@ -320,9 +463,9 @@ struct MiniPlayerBar: View {
                             .padding(.bottom, 8)
 
                         }
-                        
+                         
                         Spacer()
-                        
+                         
                         HStack(spacing: 20) {
                             Button(action: { audioManager.skipPreviousSong()}) {
                                 Image(systemName: "backward.fill")
@@ -330,7 +473,7 @@ struct MiniPlayerBar: View {
                                     .foregroundStyle(.secondary)
                             }
                             .buttonStyle(PlainButtonStyle())
-                            
+                             
                             Button {
                                 audioManager.togglePlayPause()
                             } label: {
@@ -339,27 +482,24 @@ struct MiniPlayerBar: View {
                                     .foregroundStyle(.red)
                             }
                             .buttonStyle(PlainButtonStyle())
-                            
+                             
                             Button(action: { audioManager.skipNextSong() }) {
                                 Image(systemName: "forward.fill")
                                     .font(.title)
                                     .foregroundStyle(.secondary)
                             }
                             .buttonStyle(PlainButtonStyle())
-                            .disabled(audioManager.audioFiles.count < 2)
                         }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                     .padding(.bottom, 8)
-                    
+                   
                 }
-                //.background(.ultraThinMaterial)
-                //.cornerRadius(16)
-                //.shadow(color: .black.opacity(0.1), radius: 10, y: -5)
             }
             .buttonStyle(PlainButtonStyle())
-            .glassEffect(in: .rect(cornerRadius: 16.0))
+            .background(.ultraThinMaterial)
+            .cornerRadius(16)
             .padding(.bottom, 8)
             .padding(.horizontal, 4)
         }

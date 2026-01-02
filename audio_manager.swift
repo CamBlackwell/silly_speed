@@ -5,6 +5,7 @@ import MediaPlayer
 
 class AudioManager: NSObject, ObservableObject {
     @Published var audioFiles: [AudioFile] = []
+    @Published var playlists: [Playlist] = []
     @Published var isPlaying: Bool = false
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
@@ -20,24 +21,29 @@ class AudioManager: NSObject, ObservableObject {
     private var timer: Timer?
     private let fileDirectory: URL
     private let audioFilesKey = "savedAudioFiles"
+    private let playlistsKey = "savedPlaylists"
     private let algorithmKey = "selectedAlgorithm"
     private let visualizationModeKey = "visualizationMode"
     private var isSeeking = false
+    
+    private var playbackQueue: [AudioFile] = []
 
     override init() {
         self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         super.init()
         loadAudioFiles()
+        loadPlaylists()
         loadSelectedAlgorithm()
-        loadVisualizationMode()  // Add this
+        loadVisualizationMode()
         setupAudioSession()
         initialiseEngine()
         setupInterruptionObserver()
         setupRouteChangeObserver()
         setupConfigurationChangeObserver()
+        
+        self.playbackQueue = self.audioFiles
     }
     
-    // Add this function
     private func loadVisualizationMode() {
         if let saved = UserDefaults.standard.string(forKey: visualizationModeKey),
            let mode = VisualizationMode(rawValue: saved) {
@@ -45,7 +51,6 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     
-    // Add this function
     func saveVisualizationMode() {
         UserDefaults.standard.set(visualizationMode.rawValue, forKey: visualizationModeKey)
     }
@@ -278,6 +283,9 @@ class AudioManager: NSObject, ObservableObject {
                     await MainActor.run {
                         audioFiles.append(audioFile)
                         saveAudioFiles()
+                        if playbackQueue.count == audioFiles.count - 1 {
+                             playbackQueue = audioFiles
+                        }
                     }
                 } catch {
                     print("failed to load duration \(error)")
@@ -299,6 +307,15 @@ class AudioManager: NSObject, ObservableObject {
         }
         audioFiles.removeAll{$0.id == audioFile.id}
         saveAudioFiles()
+        
+        for i in 0..<playlists.count {
+            playlists[i].audioFileIDs.removeAll { $0 == audioFile.id }
+        }
+        savePlaylists()
+        
+        if playbackQueue.contains(where: { $0.id == audioFile.id }) {
+            playbackQueue.removeAll { $0.id == audioFile.id }
+        }
     }
 
     private func saveAudioFiles(){
@@ -320,8 +337,67 @@ class AudioManager: NSObject, ObservableObject {
             print("failed to load Audio Files \(error.localizedDescription)")
         }
     }
+    
+    // MARK: - Playlist Logic
+    
+    func createPlaylist(name: String) {
+        let newPlaylist = Playlist(name: name)
+        playlists.append(newPlaylist)
+        savePlaylists()
+    }
+    
+    func deletePlaylist(_ playlist: Playlist) {
+        playlists.removeAll { $0.id == playlist.id }
+        savePlaylists()
+    }
+    
+    func addAudioFile(_ audioFile: AudioFile, to playlist: Playlist) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+        if !playlists[index].audioFileIDs.contains(audioFile.id) {
+            playlists[index].audioFileIDs.append(audioFile.id)
+            savePlaylists()
+        }
+    }
+    
+    func removeAudioFile(_ audioFile: AudioFile, from playlist: Playlist) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+        playlists[index].audioFileIDs.removeAll { $0 == audioFile.id }
+        savePlaylists()
+    }
+    
+    func getAudioFiles(for playlist: Playlist) -> [AudioFile] {
+        return playlist.audioFileIDs.compactMap { id in
+            audioFiles.first { $0.id == id }
+        }
+    }
+    
+    private func savePlaylists() {
+        do {
+            let data = try JSONEncoder().encode(playlists)
+            UserDefaults.standard.set(data, forKey: playlistsKey)
+        } catch {
+            print("failed to save playlists \(error.localizedDescription)")
+        }
+    }
+    
+    private func loadPlaylists() {
+        guard let data = UserDefaults.standard.data(forKey: playlistsKey) else { return }
+        do {
+            playlists = try JSONDecoder().decode([Playlist].self, from: data)
+        } catch {
+            print("failed to load playlists \(error.localizedDescription)")
+        }
+    }
 
-    func play(audioFile: AudioFile) {
+    // MARK: - Playback Logic
+
+    func play(audioFile: AudioFile, context: [AudioFile]? = nil) {
+        if let context = context {
+            self.playbackQueue = context
+        } else if playbackQueue.isEmpty || !playbackQueue.contains(where: { $0.id == audioFile.id }) {
+            self.playbackQueue = audioFiles
+        }
+        
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playback, mode: .default)
@@ -437,13 +513,13 @@ class AudioManager: NSObject, ObservableObject {
             return
         }
         stopTimer()
-        guard let currentIndex = audioFiles.firstIndex(where: { $0.id == currentlyPlayingID }) else {
+        guard let currentIndex = playbackQueue.firstIndex(where: { $0.id == currentlyPlayingID }) else {
             return
         }
         
         let previousIndex = currentIndex - 1
         if previousIndex >= 0 {
-            play(audioFile: audioFiles[previousIndex])
+            play(audioFile: playbackQueue[previousIndex], context: playbackQueue)
         } else {
             restartCurrentSong()
         }
@@ -466,28 +542,27 @@ class AudioManager: NSObject, ObservableObject {
     
     func skipNextSong(){
         stopTimer()
-        guard !audioFiles.isEmpty else {
+        guard !playbackQueue.isEmpty else {
             stop()
             return
         }
         
-        if let currentIndex = audioFiles.firstIndex(where: { $0.id == currentlyPlayingID }) {
+        if let currentIndex = playbackQueue.firstIndex(where: { $0.id == currentlyPlayingID }) {
             let nextIndex = currentIndex + 1
-            if nextIndex < audioFiles.count {
-                let nextFile = audioFiles[nextIndex]
-                play(audioFile: nextFile)
+            if nextIndex < playbackQueue.count {
+                play(audioFile: playbackQueue[nextIndex], context: playbackQueue)
             } else {
                 if isLooping {
-                    if let firstFile = audioFiles.first {
-                        play(audioFile: firstFile)
+                    if let firstFile = playbackQueue.first {
+                        play(audioFile: firstFile, context: playbackQueue)
                     }
                 } else {
                     stop()
                 }
             }
         } else {
-            if let firstFile = audioFiles.first {
-                play(audioFile: firstFile)
+            if let firstFile = playbackQueue.first {
+                play(audioFile: firstFile, context: playbackQueue)
             }
         }
     }
