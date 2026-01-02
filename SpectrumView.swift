@@ -1,84 +1,87 @@
 import SwiftUI
+import AudioKit
+import AudioKitUI
 
 struct SpectrumView: View {
-    @ObservedObject var analyzer: UnifiedAudioAnalyser
+    @ObservedObject var manager: SpectrumManager
     
-    private let barGradient = Gradient(colors: [
-        Color(red: 1.0, green: 0.2, blue: 0.2),
-        Color(red: 1.0, green: 0.6, blue: 0.2),
-        Color(red: 1.0, green: 1.0, blue: 0.3),
-        Color(red: 0.3, green: 1.0, blue: 0.3),
-        Color(red: 0.3, green: 0.6, blue: 1.0)
-    ])
+    // Minimeters Style Gradient: Cold (Bottom) to Hot (Top)
+    // You can adjust these colors to match your preferred theme
+    private let minimetersGradient = LinearGradient(
+        gradient: Gradient(colors: [
+            Color(red: 255/255, green: 50/255, blue: 50/255),   // Red (Clipping)
+            Color(red: 255/255, green: 200/255, blue: 50/255),  // Yellow (Loud)
+            Color(red: 50/255, green: 200/255, blue: 100/255),  // Green (Good)
+            Color(red: 50/255, green: 100/255, blue: 255/255)   // Blue (Quiet)
+        ]),
+        startPoint: .top,
+        endPoint: .bottom
+    )
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            GeometryReader { geo in
-                ZStack {
-                    Canvas { context, size in
-                        let dbLevels: [Float] = [-20, -40, -60]
-                        let dbFloor: Float = -65.0
-                        let dbRange: Float = 60.0
-                        
-                        for level in dbLevels {
-                            let y = size.height - CGFloat((level - dbFloor) / dbRange) * size.height
-                            var path = Path()
-                            path.move(to: CGPoint(x: 0, y: y))
-                            path.addLine(to: CGPoint(x: size.width, y: y))
-                            
-                            context.stroke(path, with: .color(.white.opacity(0.15)), lineWidth: 1)
-                            context.draw(Text("\(Int(level))dB").font(.system(size: 8)), at: CGPoint(x: 20, y: y - 8))
-                        }
-                    }
-
-                    Canvas { context, size in
-                        let barCount = analyzer.spectrumBands.count
-                        let barWidth = size.width / CGFloat(barCount)
-                        
-                        for i in 0..<barCount {
-                            let amplitude = CGFloat(analyzer.spectrumBands[i])
-                            let barHeight = amplitude * size.height
-                            let x = CGFloat(i) * barWidth
-                            
-                            let barRect = CGRect(x: x + 0.5, y: size.height - barHeight, width: barWidth - 1, height: barHeight)
-                            
-                            context.fill(
-                                Path(barRect),
-                                with: GraphicsContext.Shading.linearGradient(
-                                    barGradient,
-                                    startPoint: CGPoint(x: 0, y: size.height),
-                                    endPoint: CGPoint(x: 0, y: 0)
-                                )
-                            )
-                            
-                            let peak = CGFloat(analyzer.peakHolds[i])
-                            let peakY = size.height - (peak * size.height)
-                            let peakRect = CGRect(x: x + 0.5, y: peakY, width: barWidth - 1, height: 1)
-                            context.fill(Path(peakRect), with: .color(.white.opacity(0.8)))
-                        }
-                    }
-
-                    Canvas { context, size in
-                        let freqs: [Float] = [100, 1000, 5000, 10000]
-                        for f in freqs {
-                            let xPercentage = log10(f / 20.0) / log10(20000.0 / 20.0)
-                            let x = CGFloat(xPercentage) * size.width
-                            
-                            var path = Path()
-                            path.move(to: CGPoint(x: x, y: 0))
-                            path.addLine(to: CGPoint(x: x, y: size.height))
-                            context.stroke(path, with: .color(.white.opacity(0.1)), lineWidth: 1)
-                            
-                            let label = f >= 1000 ? "\(Int(f/1000))kHz" : "\(Int(f))Hz"
-                            context.draw(Text(label).font(.system(size: 8)).bold(), at: CGPoint(x: x, y: size.height - 10))
-                        }
-                    }
+        VStack {
+            ZStack {
+                // Background
+                Color.black
+                
+                if let node = manager.node {
+                    // THE CORE VISUALIZATION
+                    // We use the spectrum as a MASK.
+                    // This creates the "Level Meter" effect where the bar color
+                    // is determined by its height, not its frequency.
+                    minimetersGradient
+                        .mask(
+                            NodeFFTView(node)
+                                .padding(.top, 2) // Slight padding to avoid clipping top edge
+                        )
+                } else {
+                    // Loading State
+                    Text("Initialize Audio Engine")
+                        .font(.caption)
+                        .foregroundColor(.gray)
                 }
+                
+                // Overlay the Grid (Hz/kHz)
+                FrequencyGridOverlay()
             }
+            // Container Styling
             .frame(height: 160)
-            .background(Color.black.opacity(0.4))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(.white.opacity(0.1), lineWidth: 1))
+            .cornerRadius(8)
+            // The "Minimeters" white border
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            )
         }
         .padding(.horizontal)
+    }
+}
+
+// Your original grid logic, optimized for SwiftUI
+struct FrequencyGridOverlay: View {
+    let freqs: [(String, Float)] = [("100", 100), ("1k", 1000), ("5k", 5000), ("10k", 10000)]
+    
+    var body: some View {
+        GeometryReader { geo in
+            ForEach(freqs, id: \.1) { (label, freq) in
+                // Calculate position (Logarithmic)
+                let xPercent = log10(freq / 20.0) / log10(20000.0 / 20.0)
+                let xPos = CGFloat(xPercent) * geo.size.width
+                
+                // Draw Line
+                Path { path in
+                    path.move(to: CGPoint(x: xPos, y: 0))
+                    path.addLine(to: CGPoint(x: xPos, y: geo.size.height))
+                }
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                
+                // Draw Label
+                Text(label)
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.5))
+                    .position(x: xPos + 10, y: geo.size.height - 10)
+            }
+        }
+        .allowsHitTesting(false) // Pass touches through to controls below
     }
 }

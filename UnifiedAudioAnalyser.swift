@@ -2,8 +2,19 @@ import Foundation
 import AVFoundation
 import Combine
 import Accelerate
+import AudioKit
+
+class MixerNodeWrapper: Node {
+    var avAudioNode: AVAudioNode
+    var connections: [Node] = []
+    
+    init(_ rawNode: AVAudioNode) {
+        self.avAudioNode = rawNode
+    }
+}
 
 class UnifiedAudioAnalyser: ObservableObject {
+    @Published var node: Node?
     @Published var spectrumBands: [Float] = Array(repeating: 0.0, count: 120)
     @Published var peakHolds: [Float] = Array(repeating: 0.0, count: 120)
     
@@ -49,29 +60,12 @@ class UnifiedAudioAnalyser: ObservableObject {
     }
     
     func attach(to audioEngine: AVAudioEngine) {
-        let mixer = audioEngine.mainMixerNode
-        
-        // Remove existing tap before adding a new one to prevent crashes
-        mixer.removeTap(onBus: 0)
-        
-        let format = mixer.outputFormat(forBus: 0)
-        guard format.sampleRate > 0 else { return }
-        
-        do {
-            try mixer.installTap(onBus: 0, bufferSize: AVAudioFrameCount(bufferSize), format: format) { [weak self] buffer, _ in
-                self?.processBuffer(buffer)
-            }
-        } catch {
-            print("Error installing tap: \(error)")
-        }
+        self.node = MixerNodeWrapper(audioEngine.mainMixerNode)
     }
     
-    // MARK: - THE MISSING FUNCTION
     func detach(from audioEngine: AVAudioEngine) {
-        // Cleanly remove the tap from the mixer node
         audioEngine.mainMixerNode.removeTap(onBus: 0)
         
-        // Reset published values so the UI doesn't show "frozen" data
         DispatchQueue.main.async {
             self.spectrumBands = Array(repeating: 0.0, count: self.bandCount)
             self.peakHolds = Array(repeating: 0.0, count: self.bandCount)
