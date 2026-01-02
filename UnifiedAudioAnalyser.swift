@@ -61,6 +61,17 @@ class UnifiedAudioAnalyser: ObservableObject {
     
     func attach(to audioEngine: AVAudioEngine) {
         self.node = MixerNodeWrapper(audioEngine.mainMixerNode)
+        
+        let mixer = audioEngine.mainMixerNode
+        let format = mixer.outputFormat(forBus: 0)
+        
+        // Remove any existing tap first
+        mixer.removeTap(onBus: 0)
+        
+        // Install the tap to capture audio data
+        mixer.installTap(onBus: 0, bufferSize: AVAudioFrameCount(bufferSize), format: format) { [weak self] buffer, time in
+            self?.processBuffer(buffer)
+        }
     }
     
     func detach(from audioEngine: AVAudioEngine) {
@@ -72,6 +83,7 @@ class UnifiedAudioAnalyser: ObservableObject {
             self.leftSamples = []
             self.rightSamples = []
             self.phaseCorrelation = 0.0
+            self.node = nil
         }
     }
     

@@ -1,12 +1,9 @@
 import SwiftUI
-import AudioKit
-import AudioKitUI
 
 struct SpectrumView: View {
-    @ObservedObject var manager: SpectrumManager
+    @ObservedObject var analyzer: UnifiedAudioAnalyser
     
     // Minimeters Style Gradient: Cold (Bottom) to Hot (Top)
-    // You can adjust these colors to match your preferred theme
     private let minimetersGradient = LinearGradient(
         gradient: Gradient(colors: [
             Color(red: 255/255, green: 50/255, blue: 50/255),   // Red (Clipping)
@@ -24,21 +21,43 @@ struct SpectrumView: View {
                 // Background
                 Color.black
                 
-                if let node = manager.node {
-                    // THE CORE VISUALIZATION
-                    // We use the spectrum as a MASK.
-                    // This creates the "Level Meter" effect where the bar color
-                    // is determined by its height, not its frequency.
-                    minimetersGradient
-                        .mask(
-                            NodeFFTView(node)
-                                .padding(.top, 2) // Slight padding to avoid clipping top edge
-                        )
-                } else {
-                    // Loading State
-                    Text("Initialize Audio Engine")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                // Custom Spectrum Visualization
+                GeometryReader { geometry in
+                    Canvas { context, size in
+                        let bandWidth = size.width / CGFloat(analyzer.spectrumBands.count)
+                        
+                        for (index, magnitude) in analyzer.spectrumBands.enumerated() {
+                            let x = CGFloat(index) * bandWidth
+                            let barHeight = CGFloat(magnitude) * size.height
+                            let y = size.height - barHeight
+                            
+                            // Draw the bar
+                            let rect = CGRect(x: x, y: y, width: bandWidth - 1, height: barHeight)
+                            
+                            // Calculate color based on height (minimeters style)
+                            let heightPercent = magnitude
+                            let color: Color
+                            if heightPercent > 0.85 {
+                                color = Color(red: 255/255, green: 50/255, blue: 50/255) // Red
+                            } else if heightPercent > 0.6 {
+                                color = Color(red: 255/255, green: 200/255, blue: 50/255) // Yellow
+                            } else if heightPercent > 0.3 {
+                                color = Color(red: 50/255, green: 200/255, blue: 100/255) // Green
+                            } else {
+                                color = Color(red: 50/255, green: 100/255, blue: 255/255) // Blue
+                            }
+                            
+                            context.fill(Path(rect), with: .color(color.opacity(0.8)))
+                            
+                            // Draw peak hold
+                            if analyzer.peakHolds.indices.contains(index) {
+                                let peak = analyzer.peakHolds[index]
+                                let peakY = size.height - (CGFloat(peak) * size.height)
+                                let peakRect = CGRect(x: x, y: peakY - 1, width: bandWidth - 1, height: 2)
+                                context.fill(Path(peakRect), with: .color(.white.opacity(0.9)))
+                            }
+                        }
+                    }
                 }
                 
                 // Overlay the Grid (Hz/kHz)

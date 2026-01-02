@@ -189,7 +189,6 @@ struct AudioPlayerView: View {
                         .font(.title)
                         .foregroundStyle(.secondary)
                 }
-                .buttonStyle(PlainButtonStyle())
                 
                 Button(action: {
                     if audioManager.currentlyPlayingID != nil {
