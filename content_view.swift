@@ -329,6 +329,7 @@ struct MiniPlayerBar: View {
                                     .font(.title)
                                     .foregroundStyle(.secondary)
                             }
+                            .buttonStyle(PlainButtonStyle())
                             
                             Button {
                                 audioManager.togglePlayPause()
