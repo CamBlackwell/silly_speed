@@ -10,6 +10,12 @@ struct ContentView: View {
     @State private var libraryFilter: LibraryFilter = .songs
     @State private var showingCreatePlaylistAlert = false
     @State private var newPlaylistName = ""
+    @State private var showingRenameAlert = false
+    @State private var renamingAudioFile: AudioFile?
+    @State private var newFileName = ""
+    @State private var showingRenamePlaylistAlert = false
+    @State private var renamingPlaylist: Playlist?
+    @State private var newPlaylistNameRename = ""
     
     var body: some View {
         NavigationStack {
@@ -25,7 +31,13 @@ struct ContentView: View {
                             audioManager: audioManager,
                             filter: libraryFilter,
                             navigateToPlayer: $navigateToPlayer,
-                            selectedAudioFile: $selectedAudioFile
+                            selectedAudioFile: $selectedAudioFile,
+                            showingRenameAlert: $showingRenameAlert,
+                            renamingAudioFile: $renamingAudioFile,
+                            newFileName: $newFileName,
+                            showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
+                            renamingPlaylist: $renamingPlaylist,
+                            newPlaylistNameRename: $newPlaylistNameRename
                         )
                     }
                     
@@ -110,6 +122,42 @@ struct ContentView: View {
                     }
                 }
             }
+            .alert("Rename File", isPresented: $showingRenameAlert) {
+                TextField("New Name", text: $newFileName)
+                Button("Cancel", role: .cancel) {
+                    renamingAudioFile = nil
+                    newFileName = ""
+                }
+                Button("Rename") {
+                    if let audioFile = renamingAudioFile, !newFileName.isEmpty {
+                        audioManager.renameAudioFile(audioFile, to: newFileName)
+                    }
+                    renamingAudioFile = nil
+                    newFileName = ""
+                }
+            } message: {
+                if let audioFile = renamingAudioFile {
+                    Text("Enter a new name for '\(audioFile.fileName)'")
+                }
+            }
+            .alert("Rename Playlist", isPresented: $showingRenamePlaylistAlert) {
+                TextField("New Name", text: $newPlaylistNameRename)
+                Button("Cancel", role: .cancel) {
+                    renamingPlaylist = nil
+                    newPlaylistNameRename = ""
+                }
+                Button("Rename") {
+                    if let playlist = renamingPlaylist, !newPlaylistNameRename.isEmpty {
+                        audioManager.renamePlaylist(playlist, to: newPlaylistNameRename)
+                    }
+                    renamingPlaylist = nil
+                    newPlaylistNameRename = ""
+                }
+            } message: {
+                if let playlist = renamingPlaylist {
+                    Text("Enter a new name for '\(playlist.name)'")
+                }
+            }
             .navigationDestination(isPresented: $navigateToPlayer) {
                 if let audioFile = selectedAudioFile {
                     AudioPlayerView(audioFile: audioFile, audioManager: audioManager)
@@ -126,6 +174,12 @@ struct LibraryListView: View {
     let filter: LibraryFilter
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
+    @Binding var showingRenameAlert: Bool
+    @Binding var renamingAudioFile: AudioFile?
+    @Binding var newFileName: String
+    @Binding var showingRenamePlaylistAlert: Bool
+    @Binding var renamingPlaylist: Playlist?
+    @Binding var newPlaylistNameRename: String
     
     var body: some View {
         switch filter {
@@ -133,13 +187,22 @@ struct LibraryListView: View {
             SongsListView(
                 audioManager: audioManager,
                 navigateToPlayer: $navigateToPlayer,
-                selectedAudioFile: $selectedAudioFile
+                selectedAudioFile: $selectedAudioFile,
+                showingRenameAlert: $showingRenameAlert,
+                renamingAudioFile: $renamingAudioFile,
+                newFileName: $newFileName
             )
         case .playlists:
             PlaylistsListView(
                 audioManager: audioManager,
                 navigateToPlayer: $navigateToPlayer,
-                selectedAudioFile: $selectedAudioFile
+                selectedAudioFile: $selectedAudioFile,
+                showingRenameAlert: $showingRenameAlert,
+                renamingAudioFile: $renamingAudioFile,
+                newFileName: $newFileName,
+                showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
+                renamingPlaylist: $renamingPlaylist,
+                newPlaylistNameRename: $newPlaylistNameRename
             )
         }
     }
@@ -149,6 +212,9 @@ struct SongsListView: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
+    @Binding var showingRenameAlert: Bool
+    @Binding var renamingAudioFile: AudioFile?
+    @Binding var newFileName: String
     
     var sortedSongs: [AudioFile] {
         audioManager.sortedAudioFiles
@@ -157,7 +223,7 @@ struct SongsListView: View {
     var body: some View {
         List {
             
-            Color.clear //pushes down the first file below buttons but still allows scrolling
+            Color.clear
                 .frame(height: 30)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
@@ -168,6 +234,9 @@ struct SongsListView: View {
                     audioManager: audioManager,
                     navigateToPlayer: $navigateToPlayer,
                     selectedAudioFile: $selectedAudioFile,
+                    showingRenameAlert: $showingRenameAlert,
+                    renamingAudioFile: $renamingAudioFile,
+                    newFileName: $newFileName,
                     context: sortedSongs
                 )
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
@@ -184,6 +253,12 @@ struct PlaylistsListView: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
+    @Binding var showingRenameAlert: Bool
+    @Binding var renamingAudioFile: AudioFile?
+    @Binding var newFileName: String
+    @Binding var showingRenamePlaylistAlert: Bool
+    @Binding var renamingPlaylist: Playlist?
+    @Binding var newPlaylistNameRename: String
     
     var sortedPlaylists: [Playlist] {
         audioManager.playlists.sorted { $0.dateAdded > $1.dateAdded }
@@ -191,7 +266,7 @@ struct PlaylistsListView: View {
     
     var body: some View {
         List {
-            Color.clear //pushes down the first file below buttons but still allows scrolling
+            Color.clear
                 .frame(height: 30)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
@@ -201,12 +276,28 @@ struct PlaylistsListView: View {
                     playlist: playlist,
                     audioManager: audioManager,
                     navigateToPlayer: $navigateToPlayer,
-                    selectedAudioFile: $selectedAudioFile
+                    selectedAudioFile: $selectedAudioFile,
+                    showingRenameAlert: $showingRenameAlert,
+                    renamingAudioFile: $renamingAudioFile,
+                    newFileName: $newFileName
                 )) {
                     PlaylistRowView(playlist: playlist, audioManager: audioManager)
                 }
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .listRowSeparator(.hidden)
+                .contextMenu {
+                    Button("rename", systemImage: "pencil.and.outline") {
+                        renamingPlaylist = playlist
+                        newPlaylistNameRename = playlist.name
+                        showingRenamePlaylistAlert = true
+                    }
+                    
+                    Button(role: .destructive) {
+                        audioManager.deletePlaylist(playlist)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
                 .swipeActions {
                     Button(role: .destructive) {
                         audioManager.deletePlaylist(playlist)
@@ -279,6 +370,9 @@ struct AudioFileButton: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
+    @Binding var showingRenameAlert: Bool
+    @Binding var renamingAudioFile: AudioFile?
+    @Binding var newFileName: String
     
     var context: [AudioFile]? = nil
     
@@ -298,7 +392,13 @@ struct AudioFileButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .contextMenu {
-            AudioFileContextMenu(audioFile: audioFile, audioManager: audioManager)
+            AudioFileContextMenu(
+                audioFile: audioFile,
+                audioManager: audioManager,
+                showingRenameAlert: $showingRenameAlert,
+                renamingAudioFile: $renamingAudioFile,
+                newFileName: $newFileName
+            )
         }
     }
 }
@@ -306,10 +406,17 @@ struct AudioFileButton: View {
 struct AudioFileContextMenu: View {
     let audioFile: AudioFile
     @ObservedObject var audioManager: AudioManager
+    @Binding var showingRenameAlert: Bool
+    @Binding var renamingAudioFile: AudioFile?
+    @Binding var newFileName: String
     
     var body: some View {
         Button("share this file", systemImage: "square.and.arrow.up") {}
-        Button("rename", systemImage: "pencil.and.outline") {}
+        Button("rename", systemImage: "pencil.and.outline") {
+            renamingAudioFile = audioFile
+            newFileName = audioFile.fileName
+            showingRenameAlert = true
+        }
         
         Menu {
             ForEach(audioManager.playlists) { playlist in

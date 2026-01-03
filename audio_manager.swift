@@ -342,6 +342,21 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     
+    func renameAudioFile(_ audioFile: AudioFile, to newName: String) {
+        guard let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) else { return }
+        
+        let updatedAudioFile = AudioFile(
+            id: audioFile.id,
+            fileName: newName,
+            fileURL: audioFile.fileURL,
+            dateAdded: audioFile.dateAdded,
+            audioDuration: audioFile.audioDuration
+        )
+        
+        audioFiles[index] = updatedAudioFile
+        saveAudioFiles()
+    }
+    
     func createPlaylist(name: String) {
         let newPlaylist = Playlist(name: name)
         playlists.append(newPlaylist)
@@ -350,6 +365,12 @@ class AudioManager: NSObject, ObservableObject {
     
     func deletePlaylist(_ playlist: Playlist) {
         playlists.removeAll { $0.id == playlist.id }
+        savePlaylists()
+    }
+    
+    func renamePlaylist(_ playlist: Playlist, to newName: String) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+        playlists[index].name = newName
         savePlaylists()
     }
     

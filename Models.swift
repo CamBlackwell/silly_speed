@@ -14,6 +14,14 @@ struct AudioFile: Identifiable, Codable {
         self.dateAdded = Date()
         self.audioDuration = audioDuration
     }
+    
+    init(id: UUID, fileName: String, fileURL: URL, dateAdded: Date, audioDuration: Float) {
+        self.id = id
+        self.fileName = fileName
+        self.fileURL = fileURL
+        self.dateAdded = dateAdded
+        self.audioDuration = audioDuration
+    }
 }
 
 struct Playlist: Identifiable, Codable {

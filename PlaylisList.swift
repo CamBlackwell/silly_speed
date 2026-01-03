@@ -5,6 +5,9 @@ struct PlaylistDetailView: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
+    @Binding var showingRenameAlert: Bool
+    @Binding var renamingAudioFile: AudioFile?
+    @Binding var newFileName: String
     
     var playlistSongs: [AudioFile] {
         audioManager.getAudioFiles(for: playlist)
@@ -40,6 +43,9 @@ struct PlaylistDetailView: View {
                                     audioManager: audioManager,
                                     navigateToPlayer: $navigateToPlayer,
                                     selectedAudioFile: $selectedAudioFile,
+                                    showingRenameAlert: $showingRenameAlert,
+                                    renamingAudioFile: $renamingAudioFile,
+                                    newFileName: $newFileName,
                                     context: playlistSongs
                                 )
                                 .swipeActions {
