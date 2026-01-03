@@ -46,7 +46,8 @@ struct PlaylistDetailView: View {
                                     showingRenameAlert: $showingRenameAlert,
                                     renamingAudioFile: $renamingAudioFile,
                                     newFileName: $newFileName,
-                                    context: playlistSongs
+                                    context: playlistSongs,
+                                    isFromSongsTab: false
                                 )
                                 .swipeActions {
                                     Button(role: .destructive) {

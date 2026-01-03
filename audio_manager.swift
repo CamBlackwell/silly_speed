@@ -16,6 +16,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var audioAnalyzer = UnifiedAudioAnalyser()
     @Published var isLooping: Bool = false
     @Published var visualizationMode: VisualizationMode = .both
+    @Published var playingFromSongsTab: Bool = false
 
     private var currentEngine: AudioEngineProtocol?
     private var timer: Timer?
@@ -412,12 +413,14 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
 
-    func play(audioFile: AudioFile, context: [AudioFile]? = nil) {
+    func play(audioFile: AudioFile, context: [AudioFile]? = nil, fromSongsTab: Bool = false) {
         if let context = context {
             self.playbackQueue = context
         } else if playbackQueue.isEmpty || !playbackQueue.contains(where: { $0.id == audioFile.id }) {
             self.playbackQueue = sortedAudioFiles
         }
+        
+        self.playingFromSongsTab = fromSongsTab
         
         let session = AVAudioSession.sharedInstance()
         do {

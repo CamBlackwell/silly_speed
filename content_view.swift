@@ -237,7 +237,8 @@ struct SongsListView: View {
                     showingRenameAlert: $showingRenameAlert,
                     renamingAudioFile: $renamingAudioFile,
                     newFileName: $newFileName,
-                    context: sortedSongs
+                    context: sortedSongs,
+                    isFromSongsTab: true
                 )
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .listRowSeparator(.hidden)
@@ -375,19 +376,23 @@ struct AudioFileButton: View {
     @Binding var newFileName: String
     
     var context: [AudioFile]? = nil
+    var isFromSongsTab: Bool = false
     
     var body: some View {
         Button {
-            if audioManager.currentlyPlayingID == audioFile.id {
+            let isSameSong = audioManager.currentlyPlayingID == audioFile.id
+            let isSameContext = audioManager.playingFromSongsTab == isFromSongsTab
+            
+            if isSameSong && isSameContext {
                 selectedAudioFile = audioFile
                 navigateToPlayer = true
             } else {
-                audioManager.play(audioFile: audioFile, context: context)
+                audioManager.play(audioFile: audioFile, context: context, fromSongsTab: isFromSongsTab)
             }
         } label: {
             AudioFileRow(
                 audioFile: audioFile,
-                isCurrentlyPlaying: audioManager.currentlyPlayingID == audioFile.id
+                isCurrentlyPlaying: audioManager.currentlyPlayingID == audioFile.id && audioManager.playingFromSongsTab == isFromSongsTab
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -409,6 +414,7 @@ struct AudioFileContextMenu: View {
     @Binding var showingRenameAlert: Bool
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
+    
     
     var body: some View {
         Button("share this file", systemImage: "square.and.arrow.up") {}
