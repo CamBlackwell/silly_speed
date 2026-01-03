@@ -31,7 +31,6 @@ struct Playlist: Identifiable, Codable {
 }
 
 enum LibraryFilter: String, CaseIterable {
-    case all = "All"
     case songs = "Songs"
     case playlists = "Playlists"
 }

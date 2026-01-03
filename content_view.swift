@@ -7,10 +7,10 @@ struct ContentView: View {
     @State private var navigateToPlayer = false
     @State private var selectedAudioFile: AudioFile?
     
-    @State private var libraryFilter: LibraryFilter = .all
+    @State private var libraryFilter: LibraryFilter = .songs
     @State private var showingCreatePlaylistAlert = false
     @State private var newPlaylistName = ""
-
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -18,38 +18,10 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    HStack {
-                        Menu {
-                            Picker("Filter", selection: $libraryFilter) {
-                                ForEach(LibraryFilter.allCases, id: \.self) { filter in
-                                    Text(filter.rawValue).tag(filter)
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(libraryFilter.rawValue)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                                Image(systemName: "chevron.down")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.red)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Capsule())
-                        }
-                        .padding(.leading)
-                        .padding(.top, 10)
-                        
-                        Spacer()
-                    }
-                    
                     if audioManager.audioFiles.isEmpty && audioManager.playlists.isEmpty {
                         EmptyStateView()
                     } else {
-                        MixedLibraryList(
+                        LibraryListView(
                             audioManager: audioManager,
                             filter: libraryFilter,
                             navigateToPlayer: $navigateToPlayer,
@@ -67,9 +39,32 @@ struct ContentView: View {
                 }
                 
                 VStack {
-                    Spacer()
                     HStack {
+                        Button(action: {
+                            libraryFilter = libraryFilter == .songs ? .playlists : .songs
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: libraryFilter == .songs ? "music.note" : "music.note.list")
+                                    .font(.title2)
+                                    .foregroundStyle(.red)
+                                Text(libraryFilter.rawValue)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.white)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Capsule())
+                            .glassEffect()
+                            .foregroundStyle(.clear)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.leading, 20)
+                        .padding(.top, 10)
+
                         Spacer()
+                        
                         Menu {
                             Button {
                                 showingFilePicker = true
@@ -88,7 +83,8 @@ struct ContentView: View {
                                     .fill(.ultraThinMaterial)
                                     .opacity(0.50)
                                     .frame(width: 60, height: 60)
-                                    .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                                    .glassEffect()
+                                    .foregroundStyle(.clear)
                                 
                                 Image(systemName: "plus")
                                     .font(.system(size: 24, weight: .semibold))
@@ -96,8 +92,10 @@ struct ContentView: View {
                             }
                         }
                         .padding(.trailing, 20)
-                        .padding(.bottom, audioManager.currentlyPlayingID != nil ? 90 : 20)
+                        .padding(.top, 10)
                     }
+                    
+                    Spacer()
                 }
             }
             .sheet(isPresented: $showingFilePicker) {
@@ -113,71 +111,102 @@ struct ContentView: View {
                 }
             }
             .navigationDestination(isPresented: $navigateToPlayer) {
-                 if let audioFile = selectedAudioFile {
-                     AudioPlayerView(audioFile: audioFile, audioManager: audioManager)
-                 }
+                if let audioFile = selectedAudioFile {
+                    AudioPlayerView(audioFile: audioFile, audioManager: audioManager)
+                }
             }
         }
+        .navigationBarHidden(true)
         .tint(.red)
     }
 }
 
-struct MixedLibraryList: View {
+struct LibraryListView: View {
     @ObservedObject var audioManager: AudioManager
     let filter: LibraryFilter
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
     
-    @State private var expandedPlaylists: Set<UUID> = []
+    var body: some View {
+        switch filter {
+        case .songs:
+            SongsListView(
+                audioManager: audioManager,
+                navigateToPlayer: $navigateToPlayer,
+                selectedAudioFile: $selectedAudioFile
+            )
+        case .playlists:
+            PlaylistsListView(
+                audioManager: audioManager,
+                navigateToPlayer: $navigateToPlayer,
+                selectedAudioFile: $selectedAudioFile
+            )
+        }
+    }
+}
+
+struct SongsListView: View {
+    @ObservedObject var audioManager: AudioManager
+    @Binding var navigateToPlayer: Bool
+    @Binding var selectedAudioFile: AudioFile?
     
-    var mixedList: [LibraryItem] {
-        var items: [LibraryItem] = []
-        if filter == .all || filter == .songs {
-            items.append(contentsOf: audioManager.audioFiles.map { .song($0) })
-        }
-        if filter == .all || filter == .playlists {
-            items.append(contentsOf: audioManager.playlists.map { .playlist($0) })
-        }
-        return items.sorted { $0.dateAdded > $1.dateAdded }
+    var sortedSongs: [AudioFile] {
+        audioManager.sortedAudioFiles
     }
     
     var body: some View {
         List {
-            ForEach(mixedList) { item in
-                switch item {
-                case .song(let audioFile):
-                    AudioFileButton(
-                        audioFile: audioFile,
-                        audioManager: audioManager,
-                        navigateToPlayer: $navigateToPlayer,
-                        selectedAudioFile: $selectedAudioFile
-                    )
-                    .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
-                    .listRowSeparator(.hidden)
+            
+            Color.clear //pushes down the first file below buttons but still allows scrolling
+                .frame(height: 30)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            
+            ForEach(sortedSongs) { audioFile in
+                AudioFileButton(
+                    audioFile: audioFile,
+                    audioManager: audioManager,
+                    navigateToPlayer: $navigateToPlayer,
+                    selectedAudioFile: $selectedAudioFile,
+                    context: sortedSongs
+                )
+                .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+    }
+}
 
-                case .playlist(let playlist):
-                    PlaylistAccordionRow(
-                        playlist: playlist,
-                        isExpanded: expandedPlaylists.contains(playlist.id),
-                        audioManager: audioManager,
-                        navigateToPlayer: $navigateToPlayer,
-                        selectedAudioFile: $selectedAudioFile,
-                        toggleExpansion: {
-                            if expandedPlaylists.contains(playlist.id) {
-                                expandedPlaylists.remove(playlist.id)
-                            } else {
-                                expandedPlaylists.insert(playlist.id)
-                            }
-                        }
-                    )
-                    .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
-                    .listRowSeparator(.hidden)
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            audioManager.deletePlaylist(playlist)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
+struct PlaylistsListView: View {
+    @ObservedObject var audioManager: AudioManager
+    @Binding var navigateToPlayer: Bool
+    @Binding var selectedAudioFile: AudioFile?
+    
+    var sortedPlaylists: [Playlist] {
+        audioManager.playlists.sorted { $0.dateAdded > $1.dateAdded }
+    }
+    
+    var body: some View {
+        List {
+            ForEach(sortedPlaylists) { playlist in
+                NavigationLink(destination: PlaylistDetailView(
+                    playlist: playlist,
+                    audioManager: audioManager,
+                    navigateToPlayer: $navigateToPlayer,
+                    selectedAudioFile: $selectedAudioFile
+                )) {
+                    PlaylistRowView(playlist: playlist, audioManager: audioManager)
+                }
+                .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
+                .listRowSeparator(.hidden)
+                .swipeActions {
+                    Button(role: .destructive) {
+                        audioManager.deletePlaylist(playlist)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
                     }
                 }
             }
@@ -188,76 +217,36 @@ struct MixedLibraryList: View {
     }
 }
 
-struct PlaylistAccordionRow: View {
+struct PlaylistRowView: View {
     let playlist: Playlist
-    let isExpanded: Bool
     @ObservedObject var audioManager: AudioManager
-    @Binding var navigateToPlayer: Bool
-    @Binding var selectedAudioFile: AudioFile?
-    let toggleExpansion: () -> Void
     
     var playlistSongs: [AudioFile] {
         audioManager.getAudioFiles(for: playlist)
     }
-
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: { withAnimation(.spring()) { toggleExpansion() } }) {
-                HStack {
-                    Image(systemName: "music.note.list")
-                        .font(.title2)
-                        .foregroundStyle(.red)
-                        .frame(width: 30)
-                    
-                    VStack(alignment: .leading) {
-                        Text(playlist.name)
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                        Text("\(playlistSongs.count) songs")
-                            .font(.caption)
-                            .foregroundStyle(.gray)
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .foregroundStyle(.gray)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                }
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+        HStack {
+            Image(systemName: "music.note.list")
+                .font(.title2)
+                .foregroundStyle(.red)
+                .frame(width: 30)
             
-            if isExpanded {
-                if playlistSongs.isEmpty {
-                    Text("No songs. Long press songs in main list to add.")
-                        .font(.caption)
-                        .foregroundStyle(.gray)
-                        .padding(.leading, 40)
-                        .padding(.bottom, 8)
-                } else {
-                    ForEach(playlistSongs) { file in
-                        AudioFileButton(
-                            audioFile: file,
-                            audioManager: audioManager,
-                            navigateToPlayer: $navigateToPlayer,
-                            selectedAudioFile: $selectedAudioFile,
-                            context: playlistSongs
-                        )
-                        .padding(.leading, 20)
-                        .padding(.vertical, 4)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                audioManager.removeAudioFile(file, from: playlist)
-                            } label: {
-                                Label("Remove", systemImage: "trash")
-                            }
-                        }
-                    }
-                }
+            VStack(alignment: .leading) {
+                Text(playlist.name)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text("\(playlistSongs.count) songs")
+                    .font(.caption)
+                    .foregroundStyle(.gray)
             }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .foregroundStyle(.gray)
         }
+        .padding(.vertical, 8)
     }
 }
 

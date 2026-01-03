@@ -19,9 +19,11 @@ struct PlaylistDetailView: View {
                         .foregroundStyle(.red.opacity(0.8))
                     Text("This playlist is empty")
                         .foregroundStyle(.gray)
-                    Text("Long press a song in the main list to add it here")
+                    Text("Go to Songs view and use the context menu to add songs here")
                         .font(.caption)
                         .foregroundStyle(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
                 .frame(maxHeight: .infinity)
             } else {
@@ -32,7 +34,7 @@ struct PlaylistDetailView: View {
                             audioManager: audioManager,
                             navigateToPlayer: $navigateToPlayer,
                             selectedAudioFile: $selectedAudioFile,
-                            context: playlistSongs // Pass context here
+                            context: playlistSongs
                         )
                         .swipeActions {
                             Button(role: .destructive) {
@@ -45,6 +47,14 @@ struct PlaylistDetailView: View {
                     .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 }
                 .scrollContentBackground(.hidden)
+                
+                if audioManager.currentlyPlayingID != nil {
+                    MiniPlayerBar(
+                        audioManager: audioManager,
+                        navigateToPlayer: $navigateToPlayer,
+                        selectedAudioFile: $selectedAudioFile
+                    )
+                }
             }
         }
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))

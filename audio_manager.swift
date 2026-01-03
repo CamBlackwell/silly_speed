@@ -27,6 +27,10 @@ class AudioManager: NSObject, ObservableObject {
     private var isSeeking = false
     
     private var playbackQueue: [AudioFile] = []
+    
+    var sortedAudioFiles: [AudioFile] {
+        return audioFiles.sorted { $0.dateAdded > $1.dateAdded }
+    }
 
     override init() {
         self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -41,7 +45,7 @@ class AudioManager: NSObject, ObservableObject {
         setupRouteChangeObserver()
         setupConfigurationChangeObserver()
         
-        self.playbackQueue = self.audioFiles
+        self.playbackQueue = self.sortedAudioFiles
     }
     
     private func loadVisualizationMode() {
@@ -284,7 +288,7 @@ class AudioManager: NSObject, ObservableObject {
                         audioFiles.append(audioFile)
                         saveAudioFiles()
                         if playbackQueue.count == audioFiles.count - 1 {
-                             playbackQueue = audioFiles
+                             playbackQueue = sortedAudioFiles
                         }
                     }
                 } catch {
@@ -338,8 +342,6 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     
-    // MARK: - Playlist Logic
-    
     func createPlaylist(name: String) {
         let newPlaylist = Playlist(name: name)
         playlists.append(newPlaylist)
@@ -389,13 +391,11 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Playback Logic
-
     func play(audioFile: AudioFile, context: [AudioFile]? = nil) {
         if let context = context {
             self.playbackQueue = context
         } else if playbackQueue.isEmpty || !playbackQueue.contains(where: { $0.id == audioFile.id }) {
-            self.playbackQueue = audioFiles
+            self.playbackQueue = sortedAudioFiles
         }
         
         let session = AVAudioSession.sharedInstance()
