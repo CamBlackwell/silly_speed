@@ -191,6 +191,11 @@ struct PlaylistsListView: View {
     
     var body: some View {
         List {
+            Color.clear //pushes down the first file below buttons but still allows scrolling
+                .frame(height: 30)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            
             ForEach(sortedPlaylists) { playlist in
                 NavigationLink(destination: PlaylistDetailView(
                     playlist: playlist,
