@@ -570,88 +570,92 @@ struct MiniPlayerBar: View {
     
     var body: some View {
         if let audioFile = currentAudioFile {
-            Button {
-                selectedAudioFile = audioFile
-                navigateToPlayer = true
-            } label: {
-                VStack(spacing: 0) {
-                    HStack(spacing: 12) {
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+
+                    Button {
+                        selectedAudioFile = audioFile
+                        navigateToPlayer = true
+                    } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(audioFile.fileName)
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .lineLimit(1)
                                 .foregroundStyle(.primary)
-                            
+
                             HStack {
                                 Text(formatTime(Float(audioManager.currentTime)))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer()
-                                 
                                 Text(formatTime(audioFile.audioDuration))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+
                             GeometryReader { geometry in
                                 ZStack(alignment: .leading) {
                                     Rectangle()
                                         .fill(Color.gray.opacity(0.3))
                                         .frame(height: 3)
-                                     
+
                                     Rectangle()
                                         .fill(Color.red)
-                                        .frame(width: geometry.size.width * progressPercentage, height: 3)
+                                        .frame(
+                                            width: geometry.size.width * progressPercentage,
+                                            height: 3
+                                        )
                                 }
                             }
                             .frame(height: 3)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8)
-
                         }
-                         
-                        Spacer()
-                         
-                        HStack(spacing: 20) {
-                            Button(action: { audioManager.skipPreviousSong()}) {
-                                Image(systemName: "backward.fill")
-                                    .font(.title)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                             
-                            Button {
-                                audioManager.togglePlayPause()
-                            } label: {
-                                Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.title2)
-                                    .foregroundStyle(.red)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                             
-                            Button(action: { audioManager.skipNextSong() }) {
-                                Image(systemName: "forward.fill")
-                                    .font(.title)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
+                        .contentShape(Rectangle())
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-                   
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    HStack(spacing: 20) {
+                        Button(action: { audioManager.skipPreviousSong() }) {
+                            Image(systemName: "backward.fill")
+                                .font(.title)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            audioManager.togglePlayPause()
+                        } label: {
+                            Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
+                                .font(.title2)
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: { audioManager.skipNextSong() }) {
+                            Image(systemName: "forward.fill")
+                                .font(.title)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
             }
-            .buttonStyle(PlainButtonStyle())
             .background(.ultraThinMaterial)
             .cornerRadius(16)
             .padding(.bottom, 8)
             .padding(.horizontal, 4)
         }
-
     }
-    
+
+
+
     private var progressPercentage: CGFloat {
         guard audioManager.duration > 0 else { return 0 }
         return CGFloat(audioManager.currentTime / audioManager.duration)
