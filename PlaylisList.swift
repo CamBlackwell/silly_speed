@@ -9,9 +9,10 @@ struct PlaylistDetailView: View {
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
     @State private var isReorderMode = false
+    @State private var displayedSongs: [AudioFile] = []
     
     var playlistSongs: [AudioFile] {
-        audioManager.getAudioFiles(for: playlist)
+        displayedSongs
     }
     
     var body: some View {
@@ -61,7 +62,9 @@ struct PlaylistDetailView: View {
                                 }
                             }
                             .onMove { source, destination in
-                                audioManager.reorderPlaylistSongs(in: playlist, from: source, to: destination)
+                                displayedSongs.move(fromOffsets: source, toOffset: destination)
+                                let reorderedIDs = displayedSongs.map { $0.id }
+                                audioManager.updatePlaylistOrder(playlist, with: reorderedIDs)
                             }
                             .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                         }
@@ -89,6 +92,9 @@ struct PlaylistDetailView: View {
                     }
                 }
             }
+        }
+        .onAppear {
+            displayedSongs = audioManager.getAudioFiles(for: playlist)
         }
     }
 }

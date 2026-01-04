@@ -248,7 +248,7 @@ struct SongsListView: View {
     @Environment(\.editMode) private var editMode
     
     var sortedSongs: [AudioFile] {
-        audioManager.sortedAudioFiles
+        audioManager.displayedSongs
     }
     
     var body: some View {
@@ -259,7 +259,7 @@ struct SongsListView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             
-            ForEach(sortedSongs) { audioFile in
+            ForEach(sortedSongs, id: \.id) { audioFile in
                 AudioFileButton(
                     audioFile: audioFile,
                     audioManager: audioManager,
@@ -376,8 +376,6 @@ struct PlaylistRowView: View {
             
             Spacer()
             
-            Image(systemName: "chevron.right")
-                .foregroundStyle(.gray)
         }
         .padding(.vertical, 8)
     }

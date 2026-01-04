@@ -18,6 +18,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var isLooping: Bool = false
     @Published var visualizationMode: VisualizationMode = .both
     @Published var playingFromSongsTab: Bool = false
+    @Published var displayedSongs: [AudioFile] = []
 
     private var currentEngine: AudioEngineProtocol?
     private var timer: Timer?
@@ -49,6 +50,7 @@ class AudioManager: NSObject, ObservableObject {
         loadAudioFiles()
         loadPlaylists()
         loadOrCreateMasterPlaylist()
+        self.displayedSongs = self.sortedAudioFiles
         loadSelectedAlgorithm()
         loadVisualizationMode()
         setupAudioSession()
@@ -120,20 +122,34 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
 
+
     func reorderSongs(from source: IndexSet, to destination: Int) {
+        displayedSongs.move(fromOffsets: source, toOffset: destination)
+        
         guard let masterID = masterPlaylistID,
               let index = playlists.firstIndex(where: { $0.id == masterID }) else { return }
         
-        var updatedPlaylist = playlists[index]
-        updatedPlaylist.audioFileIDs.move(fromOffsets: source, toOffset: destination)
-        playlists[index] = updatedPlaylist
+        let reorderedIDs = displayedSongs.map { $0.id }
+        playlists[index].audioFileIDs = reorderedIDs
         savePlaylists()
+        
+        if playingFromSongsTab {
+            playbackQueue = displayedSongs
+        }
     }
 
     func reorderPlaylistSongs(in playlist: Playlist, from source: IndexSet, to destination: Int) {
         guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
-        playlists[index].audioFileIDs.move(fromOffsets: source, toOffset: destination)
-        savePlaylists()
+        
+        var updatedPlaylist = playlists[index]
+        updatedPlaylist.audioFileIDs.move(fromOffsets: source, toOffset: destination)
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.playlists[index] = updatedPlaylist
+            self.savePlaylists()
+        }
     }
     
     private func saveSelectedAlgorithm(){
@@ -341,6 +357,7 @@ class AudioManager: NSObject, ObservableObject {
                         if let masterID = self.masterPlaylistID,
                            let index = self.playlists.firstIndex(where: { $0.id == masterID }) {
                             self.playlists[index].audioFileIDs.append(audioFile.id)
+                            self.displayedSongs = self.sortedAudioFiles
                             self.savePlaylists()
                         }
                         
@@ -368,6 +385,7 @@ class AudioManager: NSObject, ObservableObject {
         }
         audioFiles.removeAll{$0.id == audioFile.id}
         saveAudioFiles()
+        displayedSongs = sortedAudioFiles
         
         for i in 0..<playlists.count {
             playlists[i].audioFileIDs.removeAll { $0 == audioFile.id }
@@ -545,6 +563,17 @@ class AudioManager: NSObject, ObservableObject {
             updateNowPlayingInfo()
         }
     }
+    
+    func updatePlaylistOrder(_ playlist: Playlist, with ids: [UUID]) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+        playlists[index].audioFileIDs = ids
+        savePlaylists()
+        
+        if !playingFromSongsTab {
+            let reorderedSongs = ids.compactMap { id in audioFiles.first { $0.id == id } }
+            playbackQueue = reorderedSongs
+        }
+    }
 
     func seek(to time: TimeInterval){
         isSeeking = true
@@ -626,6 +655,7 @@ class AudioManager: NSObject, ObservableObject {
         self.currentTime = 0
         updateNowPlayingInfo()
     }
+    
     
     func skipNextSong(){
         stopTimer()

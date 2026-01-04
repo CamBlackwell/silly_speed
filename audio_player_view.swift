@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct AudioPlayerView: View {
     let audioFile: AudioFile
@@ -7,7 +8,7 @@ struct AudioPlayerView: View {
     @State private var isScrubbing: Bool = false
     @State private var sliderValue: Double = 0
     @State private var isDragging = false
-    
+
     var body: some View {
         ZStack {
             Color(red: 0.15, green: 0.15, blue: 0.15)
@@ -45,6 +46,7 @@ struct AudioPlayerView: View {
             }
         }
     }
+    
     
     // MARK: - Visualization Selector
     private var visualizationSelector: some View {
@@ -330,4 +332,8 @@ struct AudioPlayerView: View {
         }
         .padding(.horizontal)
     }
+    
 }
+
+
+
