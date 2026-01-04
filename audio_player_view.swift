@@ -8,11 +8,13 @@ struct AudioPlayerView: View {
     @State private var isScrubbing: Bool = false
     @State private var sliderValue: Double = 0
     @State private var isDragging = false
+   
 
     var body: some View {
         ZStack {
             Color(red: 0.15, green: 0.15, blue: 0.15)
                 .ignoresSafeArea()
+            
             
             VStack(spacing: 8) {
                 Text(activeFile?.fileName ?? audioFile.fileName)
@@ -79,6 +81,8 @@ struct AudioPlayerView: View {
             .padding()
         }
     }
+    
+
     
     // MARK: - Dynamic Visualization View
     @ViewBuilder
@@ -170,6 +174,7 @@ struct AudioPlayerView: View {
                     sliderValue = newTime
                 }
             }
+            .onAppear { sliderValue = audioManager.currentTime }
             HStack {
                 Text(formatTime(isDragging ? sliderValue : audioManager.currentTime))
                     .font(.caption)
