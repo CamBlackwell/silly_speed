@@ -414,6 +414,8 @@ class AudioManager: NSObject, ObservableObject {
     }
 
     func play(audioFile: AudioFile, context: [AudioFile]? = nil, fromSongsTab: Bool = false) {
+        let isSameSong = currentlyPlayingID == audioFile.id
+        
         if let context = context {
             self.playbackQueue = context
         } else if playbackQueue.isEmpty || !playbackQueue.contains(where: { $0.id == audioFile.id }) {
@@ -421,6 +423,11 @@ class AudioManager: NSObject, ObservableObject {
         }
         
         self.playingFromSongsTab = fromSongsTab
+        
+        if isSameSong {
+            updateNowPlayingInfo()
+            return
+        }
         
         let session = AVAudioSession.sharedInstance()
         do {
@@ -543,7 +550,7 @@ class AudioManager: NSObject, ObservableObject {
         
         let previousIndex = currentIndex - 1
         if previousIndex >= 0 {
-            play(audioFile: playbackQueue[previousIndex], context: playbackQueue)
+            play(audioFile: playbackQueue[previousIndex], context: playbackQueue, fromSongsTab: playingFromSongsTab)
         } else {
             restartCurrentSong()
         }
@@ -574,11 +581,11 @@ class AudioManager: NSObject, ObservableObject {
         if let currentIndex = playbackQueue.firstIndex(where: { $0.id == currentlyPlayingID }) {
             let nextIndex = currentIndex + 1
             if nextIndex < playbackQueue.count {
-                play(audioFile: playbackQueue[nextIndex], context: playbackQueue)
+                play(audioFile: playbackQueue[nextIndex], context: playbackQueue, fromSongsTab: playingFromSongsTab)
             } else {
                 if isLooping {
                     if let firstFile = playbackQueue.first {
-                        play(audioFile: firstFile, context: playbackQueue)
+                        play(audioFile: firstFile, context: playbackQueue, fromSongsTab: playingFromSongsTab)
                     }
                 } else {
                     stop()
@@ -586,7 +593,7 @@ class AudioManager: NSObject, ObservableObject {
             }
         } else {
             if let firstFile = playbackQueue.first {
-                play(audioFile: firstFile, context: playbackQueue)
+                play(audioFile: firstFile, context: playbackQueue, fromSongsTab: playingFromSongsTab)
             }
         }
     }
