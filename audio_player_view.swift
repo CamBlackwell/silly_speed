@@ -171,7 +171,7 @@ struct AudioPlayerView: View {
                 }
             }
             HStack {
-                Text(formatTime(audioManager.currentTime))
+                Text(formatTime(isDragging ? sliderValue : audioManager.currentTime))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
