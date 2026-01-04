@@ -17,6 +17,8 @@ struct ContentView: View {
     @State private var renamingPlaylist: Playlist?
     @State private var newPlaylistNameRename = ""
     @State private var isReorderMode = false
+    @State private var showingShareSheet = false
+    @State private var shareURL: URL?
     
     var body: some View {
         NavigationStack {
@@ -209,6 +211,7 @@ struct LibraryListView: View {
     @Binding var newPlaylistNameRename: String
     @Binding var isReorderMode: Bool
     
+    
     var body: some View {
         switch filter {
         case .songs:
@@ -246,19 +249,21 @@ struct SongsListView: View {
     @Binding var newFileName: String
     @Binding var isReorderMode: Bool
     @Environment(\.editMode) private var editMode
-    
+
+    @State private var showingShareSheet = false
+    @State private var shareURL: URL?
+
     var sortedSongs: [AudioFile] {
         audioManager.displayedSongs
     }
-    
+
     var body: some View {
         List {
-            
             Color.clear
                 .frame(height: 30)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-            
+
             ForEach(sortedSongs, id: \.id) { audioFile in
                 AudioFileButton(
                     audioFile: audioFile,
@@ -270,7 +275,9 @@ struct SongsListView: View {
                     newFileName: $newFileName,
                     context: sortedSongs,
                     isFromSongsTab: true,
-                    isReorderMode: isReorderMode
+                    isReorderMode: isReorderMode,
+                    showingShareSheet: $showingShareSheet,
+                    shareURL: $shareURL
                 )
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .listRowSeparator(.hidden)
@@ -283,8 +290,14 @@ struct SongsListView: View {
         .scrollContentBackground(.hidden)
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))
         .environment(\.editMode, isReorderMode ? .constant(.active) : .constant(.inactive))
+        .sheet(isPresented: $showingShareSheet) {
+            if let url = shareURL {
+                ShareSheet(activityItems: [url])
+            }
+        }
     }
 }
+
 
 struct PlaylistsListView: View {
     @ObservedObject var audioManager: AudioManager
@@ -408,17 +421,20 @@ struct AudioFileButton: View {
     @Binding var showingRenameAlert: Bool
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
-    
+
     var context: [AudioFile]? = nil
     var isFromSongsTab: Bool = false
     var isReorderMode: Bool = false
-    
+
+    @Binding var showingShareSheet: Bool
+    @Binding var shareURL: URL?
+
     var body: some View {
         Button {
             if !isReorderMode {
                 let isSameSong = audioManager.currentlyPlayingID == audioFile.id
                 let isSameContext = audioManager.playingFromSongsTab == isFromSongsTab
-                
+
                 if isSameSong && isSameContext {
                     selectedAudioFile = audioFile
                     navigateToPlayer = true
@@ -440,12 +456,25 @@ struct AudioFileButton: View {
                     audioManager: audioManager,
                     showingRenameAlert: $showingRenameAlert,
                     renamingAudioFile: $renamingAudioFile,
-                    newFileName: $newFileName
+                    newFileName: $newFileName,
+                    showingShareSheet: $showingShareSheet,
+                    shareURL: $shareURL
                 )
             }
         }
     }
 }
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
 
 struct AudioFileContextMenu: View {
     let audioFile: AudioFile
@@ -453,16 +482,21 @@ struct AudioFileContextMenu: View {
     @Binding var showingRenameAlert: Bool
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
-    
-    
+    @Binding var showingShareSheet: Bool
+    @Binding var shareURL: URL?
+
     var body: some View {
-        Button("share this file", systemImage: "square.and.arrow.up") {}
+        Button("share this file", systemImage: "square.and.arrow.up") {
+            shareURL = audioManager.urlForSharing(audioFile)
+            showingShareSheet = true
+        }
+
         Button("rename", systemImage: "pencil.and.outline") {
             renamingAudioFile = audioFile
             newFileName = audioFile.fileName
             showingRenameAlert = true
         }
-        
+
         Menu {
             ForEach(audioManager.playlists) { playlist in
                 Button(playlist.name) {
@@ -480,6 +514,9 @@ struct AudioFileContextMenu: View {
         }
     }
 }
+
+
+
 
 struct AudioFileRow: View {
     let audioFile: AudioFile
@@ -666,4 +703,7 @@ struct MiniPlayerBar: View {
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
+
 }
+
+

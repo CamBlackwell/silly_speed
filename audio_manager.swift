@@ -432,6 +432,11 @@ class AudioManager: NSObject, ObservableObject {
         saveAudioFiles()
     }
     
+    func urlForSharing(_ audioFile: AudioFile) -> URL? {
+        audioFile.fileURL
+    }
+
+    
     func createPlaylist(name: String) {
         let newPlaylist = Playlist(name: name)
         playlists.append(newPlaylist)
@@ -584,6 +589,7 @@ class AudioManager: NSObject, ObservableObject {
             self?.isSeeking = false
         }
     }
+    
 
     func setVolume(_ volume: Float){
         currentEngine?.setVolume(volume)

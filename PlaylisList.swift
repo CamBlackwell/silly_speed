@@ -10,6 +10,8 @@ struct PlaylistDetailView: View {
     @Binding var newFileName: String
     @State private var isReorderMode = false
     @State private var displayedSongs: [AudioFile] = []
+    @State private var showingShareSheet = false
+    @State private var shareURL: URL?
     
     var playlistSongs: [AudioFile] {
         displayedSongs
@@ -49,7 +51,10 @@ struct PlaylistDetailView: View {
                                     newFileName: $newFileName,
                                     context: playlistSongs,
                                     isFromSongsTab: false,
-                                    isReorderMode: isReorderMode
+                                    isReorderMode: isReorderMode,
+                                    showingShareSheet: $showingShareSheet,
+                                    shareURL: $shareURL
+
                                 )
                                 .swipeActions {
                                     if !isReorderMode {
@@ -96,5 +101,6 @@ struct PlaylistDetailView: View {
         .onAppear {
             displayedSongs = audioManager.getAudioFiles(for: playlist)
         }
+        .sheet(isPresented: $showingShareSheet) { if let url = shareURL { ShareSheet(activityItems: [url]) } }
     }
 }
