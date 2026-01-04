@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import Combine
 import MediaPlayer
+import SwiftUI
 
 class AudioManager: NSObject, ObservableObject {
     @Published var audioFiles: [AudioFile] = []
@@ -26,11 +27,20 @@ class AudioManager: NSObject, ObservableObject {
     private let algorithmKey = "selectedAlgorithm"
     private let visualizationModeKey = "visualizationMode"
     private var isSeeking = false
+    private let masterPlaylistKey = "masterPlaylistID"
+    private var masterPlaylistID: UUID?
     
     private var playbackQueue: [AudioFile] = []
     
     var sortedAudioFiles: [AudioFile] {
-        return audioFiles.sorted { $0.dateAdded > $1.dateAdded }
+        guard let masterID = masterPlaylistID,
+              let masterPlaylist = playlists.first(where: { $0.id == masterID }) else {
+            return audioFiles.sorted { $0.dateAdded > $1.dateAdded }
+        }
+        
+        return masterPlaylist.audioFileIDs.compactMap { id in
+            audioFiles.first { $0.id == id }
+        }
     }
 
     override init() {
@@ -38,6 +48,7 @@ class AudioManager: NSObject, ObservableObject {
         super.init()
         loadAudioFiles()
         loadPlaylists()
+        loadOrCreateMasterPlaylist()
         loadSelectedAlgorithm()
         loadVisualizationMode()
         setupAudioSession()
@@ -85,6 +96,44 @@ class AudioManager: NSObject, ObservableObject {
            algorithm.isImplemented {
             selectedAlgorithm = algorithm
         }
+    }
+    private func loadOrCreateMasterPlaylist() {
+        if let data = UserDefaults.standard.data(forKey: masterPlaylistKey),
+           let id = try? JSONDecoder().decode(UUID.self, from: data),
+           playlists.contains(where: { $0.id == id }) {
+            masterPlaylistID = id
+        } else {
+            let masterPlaylist = Playlist(name: "__MASTER_SONGS__")
+            masterPlaylistID = masterPlaylist.id
+            playlists.append(masterPlaylist)
+            
+            for audioFile in audioFiles {
+                if let index = playlists.firstIndex(where: { $0.id == masterPlaylistID }) {
+                    playlists[index].audioFileIDs.append(audioFile.id)
+                }
+            }
+            
+            savePlaylists()
+            if let data = try? JSONEncoder().encode(masterPlaylistID) {
+                UserDefaults.standard.set(data, forKey: masterPlaylistKey)
+            }
+        }
+    }
+
+    func reorderSongs(from source: IndexSet, to destination: Int) {
+        guard let masterID = masterPlaylistID,
+              let index = playlists.firstIndex(where: { $0.id == masterID }) else { return }
+        
+        var updatedPlaylist = playlists[index]
+        updatedPlaylist.audioFileIDs.move(fromOffsets: source, toOffset: destination)
+        playlists[index] = updatedPlaylist
+        savePlaylists()
+    }
+
+    func reorderPlaylistSongs(in playlist: Playlist, from source: IndexSet, to destination: Int) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+        playlists[index].audioFileIDs.move(fromOffsets: source, toOffset: destination)
+        savePlaylists()
     }
     
     private func saveSelectedAlgorithm(){
@@ -288,6 +337,13 @@ class AudioManager: NSObject, ObservableObject {
                     await MainActor.run {
                         audioFiles.append(audioFile)
                         saveAudioFiles()
+                        
+                        if let masterID = self.masterPlaylistID,
+                           let index = self.playlists.firstIndex(where: { $0.id == masterID }) {
+                            self.playlists[index].audioFileIDs.append(audioFile.id)
+                            self.savePlaylists()
+                        }
+                        
                         if playbackQueue.count == audioFiles.count - 1 {
                              playbackQueue = sortedAudioFiles
                         }

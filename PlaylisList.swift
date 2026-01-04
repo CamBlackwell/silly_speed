@@ -8,6 +8,7 @@ struct PlaylistDetailView: View {
     @Binding var showingRenameAlert: Bool
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
+    @State private var isReorderMode = false
     
     var playlistSongs: [AudioFile] {
         audioManager.getAudioFiles(for: playlist)
@@ -18,7 +19,6 @@ struct PlaylistDetailView: View {
             ZStack {
                 Color(red: 0.15, green: 0.15, blue: 0.15)
                     .ignoresSafeArea()
-                
                 
                 VStack {
                     if playlistSongs.isEmpty {
@@ -47,19 +47,26 @@ struct PlaylistDetailView: View {
                                     renamingAudioFile: $renamingAudioFile,
                                     newFileName: $newFileName,
                                     context: playlistSongs,
-                                    isFromSongsTab: false
+                                    isFromSongsTab: false,
+                                    isReorderMode: isReorderMode
                                 )
                                 .swipeActions {
-                                    Button(role: .destructive) {
-                                        audioManager.removeAudioFile(audioFile, from: playlist)
-                                    } label: {
-                                        Label("Remove", systemImage: "trash")
+                                    if !isReorderMode {
+                                        Button(role: .destructive) {
+                                            audioManager.removeAudioFile(audioFile, from: playlist)
+                                        } label: {
+                                            Label("Remove", systemImage: "trash")
+                                        }
                                     }
                                 }
+                            }
+                            .onMove { source, destination in
+                                audioManager.reorderPlaylistSongs(in: playlist, from: source, to: destination)
                             }
                             .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                         }
                         .scrollContentBackground(.hidden)
+                        .environment(\.editMode, isReorderMode ? .constant(.active) : .constant(.inactive))
                         
                         if audioManager.currentlyPlayingID != nil {
                             MiniPlayerBar(
@@ -73,6 +80,14 @@ struct PlaylistDetailView: View {
                 .background(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .navigationTitle(playlist.name)
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(isReorderMode ? "Done" : "Reorder") {
+                            isReorderMode.toggle()
+                        }
+                        .foregroundStyle(.red)
+                    }
+                }
             }
         }
     }

@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var showingRenamePlaylistAlert = false
     @State private var renamingPlaylist: Playlist?
     @State private var newPlaylistNameRename = ""
+    @State private var isReorderMode = false
     
     var body: some View {
         NavigationStack {
@@ -37,7 +38,8 @@ struct ContentView: View {
                             newFileName: $newFileName,
                             showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
                             renamingPlaylist: $renamingPlaylist,
-                            newPlaylistNameRename: $newPlaylistNameRename
+                            newPlaylistNameRename: $newPlaylistNameRename,
+                            isReorderMode: $isReorderMode
                         )
                     }
                     
@@ -77,34 +79,59 @@ struct ContentView: View {
 
                         Spacer()
                         
-                        Menu {
+                        if isReorderMode {
                             Button {
-                                showingFilePicker = true
+                                isReorderMode = false
                             } label: {
-                                Label("Add Songs", systemImage: "music.note.list")
+                                Text("Done")
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 12)
+                                    .background(.red)
+                                    .clipShape(Capsule())
                             }
-                            Button {
-                                newPlaylistName = ""
-                                showingCreatePlaylistAlert = true
-                            } label: {
-                                Label("Create Playlist", systemImage: "text.badge.plus")
-                            }
-                        } label: {
-                            ZStack {
-                                Circle()
-                                    .fill(.ultraThinMaterial)
-                                    .opacity(0.50)
-                                    .frame(width: 60, height: 60)
-                                    .glassEffect()
-                                    .foregroundStyle(.clear)
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.trailing, 20)
+                            .padding(.top, 10)
+                        } else {
+                            Menu {
+                                Button {
+                                    showingFilePicker = true
+                                } label: {
+                                    Label("Add Songs", systemImage: "music.note.list")
+                                }
+                                Button {
+                                    newPlaylistName = ""
+                                    showingCreatePlaylistAlert = true
+                                } label: {
+                                    Label("Create Playlist", systemImage: "text.badge.plus")
+                                }
                                 
-                                Image(systemName: "plus")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundStyle(.red)
+                                if libraryFilter == .songs {
+                                    Button {
+                                        isReorderMode = true
+                                    } label: {
+                                        Label("Reorder Songs", systemImage: "arrow.up.arrow.down")
+                                    }
+                                }
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(.ultraThinMaterial)
+                                        .opacity(0.50)
+                                        .frame(width: 60, height: 60)
+                                        .glassEffect()
+                                        .foregroundStyle(.clear)
+                                    
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 24, weight: .semibold))
+                                        .foregroundStyle(.red)
+                                }
                             }
+                            .padding(.trailing, 20)
+                            .padding(.top, 10)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.top, 10)
                     }
                     
                     Spacer()
@@ -180,6 +207,7 @@ struct LibraryListView: View {
     @Binding var showingRenamePlaylistAlert: Bool
     @Binding var renamingPlaylist: Playlist?
     @Binding var newPlaylistNameRename: String
+    @Binding var isReorderMode: Bool
     
     var body: some View {
         switch filter {
@@ -190,7 +218,8 @@ struct LibraryListView: View {
                 selectedAudioFile: $selectedAudioFile,
                 showingRenameAlert: $showingRenameAlert,
                 renamingAudioFile: $renamingAudioFile,
-                newFileName: $newFileName
+                newFileName: $newFileName,
+                isReorderMode: $isReorderMode
             )
         case .playlists:
             PlaylistsListView(
@@ -215,6 +244,8 @@ struct SongsListView: View {
     @Binding var showingRenameAlert: Bool
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
+    @Binding var isReorderMode: Bool
+    @Environment(\.editMode) private var editMode
     
     var sortedSongs: [AudioFile] {
         audioManager.sortedAudioFiles
@@ -238,15 +269,20 @@ struct SongsListView: View {
                     renamingAudioFile: $renamingAudioFile,
                     newFileName: $newFileName,
                     context: sortedSongs,
-                    isFromSongsTab: true
+                    isFromSongsTab: true,
+                    isReorderMode: isReorderMode
                 )
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .listRowSeparator(.hidden)
+            }
+            .onMove { source, destination in
+                audioManager.reorderSongs(from: source, to: destination)
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .environment(\.editMode, isReorderMode ? .constant(.active) : .constant(.inactive))
     }
 }
 
@@ -377,17 +413,20 @@ struct AudioFileButton: View {
     
     var context: [AudioFile]? = nil
     var isFromSongsTab: Bool = false
+    var isReorderMode: Bool = false
     
     var body: some View {
         Button {
-            let isSameSong = audioManager.currentlyPlayingID == audioFile.id
-            let isSameContext = audioManager.playingFromSongsTab == isFromSongsTab
-            
-            if isSameSong && isSameContext {
-                selectedAudioFile = audioFile
-                navigateToPlayer = true
-            } else {
-                audioManager.play(audioFile: audioFile, context: context, fromSongsTab: isFromSongsTab)
+            if !isReorderMode {
+                let isSameSong = audioManager.currentlyPlayingID == audioFile.id
+                let isSameContext = audioManager.playingFromSongsTab == isFromSongsTab
+                
+                if isSameSong && isSameContext {
+                    selectedAudioFile = audioFile
+                    navigateToPlayer = true
+                } else {
+                    audioManager.play(audioFile: audioFile, context: context, fromSongsTab: isFromSongsTab)
+                }
             }
         } label: {
             AudioFileRow(
@@ -397,13 +436,15 @@ struct AudioFileButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .contextMenu {
-            AudioFileContextMenu(
-                audioFile: audioFile,
-                audioManager: audioManager,
-                showingRenameAlert: $showingRenameAlert,
-                renamingAudioFile: $renamingAudioFile,
-                newFileName: $newFileName
-            )
+            if !isReorderMode {
+                AudioFileContextMenu(
+                    audioFile: audioFile,
+                    audioManager: audioManager,
+                    showingRenameAlert: $showingRenameAlert,
+                    renamingAudioFile: $renamingAudioFile,
+                    newFileName: $newFileName
+                )
+            }
         }
     }
 }
