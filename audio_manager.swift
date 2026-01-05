@@ -36,6 +36,8 @@ class AudioManager: NSObject, ObservableObject {
     @Published var visualisationMode: VisualisationMode = .both
     @Published var playingFromSongsTab: Bool = false
     @Published var displayedSongs: [AudioFile] = []
+    @Published var isImporting: Bool = false
+    @Published var importError: String?
 
     private var currentEngine: AudioEngineProtocol?
     private var timer: Timer?
@@ -50,6 +52,7 @@ class AudioManager: NSObject, ObservableObject {
     private var masterPlaylistID: UUID?
     
     private var playbackQueue: [AudioFile] = []
+    private var observerTokens: [Any] = []
     
     var sortedAudioFiles: [AudioFile] {
         guard let masterID = masterPlaylistID,
@@ -68,6 +71,7 @@ class AudioManager: NSObject, ObservableObject {
         super.init()
         try? FileManager.default.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
         loadAudioFiles()
+        cleanupOrphanedFiles()
         loadPlaylists()
         loadOrCreateMasterPlaylist()
         self.displayedSongs = self.sortedAudioFiles
@@ -81,32 +85,43 @@ class AudioManager: NSObject, ObservableObject {
         
         self.playbackQueue = self.sortedAudioFiles
         
-        NotificationCenter.default.addObserver(
+        let bgToken = NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             guard let self = self else { return }
             
-            //only deactivate if we're paused and exit app
             if !self.isPlaying {
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
             self.updateNowPlayingInfo()
         }
+        observerTokens.append(bgToken)
         
-        NotificationCenter.default.addObserver(
+        let fgToken = NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             guard let self = self else { return }
             
-            // Reactivate session when returning to foreground if we have a current track
             if self.currentlyPlayingID != nil {
                 try? AVAudioSession.sharedInstance().setActive(true)
             }
         }
+        observerTokens.append(fgToken)
+    }
+    
+    deinit {
+        timer?.invalidate()
+        timer = nil
+        for token in observerTokens {
+            NotificationCenter.default.removeObserver(token)
+        }
+        observerTokens.removeAll()
+        currentEngine?.stop()
+        try? AVAudioSession.sharedInstance().setActive(false)
     }
     
     private func loadVisualisationMode() {
@@ -121,7 +136,7 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     private func setupConfigurationChangeObserver() {
-        NotificationCenter.default.addObserver(
+        let token = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: nil,
             queue: .main
@@ -137,6 +152,7 @@ class AudioManager: NSObject, ObservableObject {
                 }
             }
         }
+        observerTokens.append(token)
     }
     
     private func loadSelectedAlgorithm(){
@@ -258,7 +274,7 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     private func setupInterruptionObserver() {
-        NotificationCenter.default.addObserver(
+        let token = NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance(),
             queue: .main
@@ -288,10 +304,11 @@ class AudioManager: NSObject, ObservableObject {
                 }
             }
         }
+        observerTokens.append(token)
     }
     
     private func setupRouteChangeObserver() {
-        NotificationCenter.default.addObserver(
+        let token = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(),
             queue: .main
@@ -306,6 +323,7 @@ class AudioManager: NSObject, ObservableObject {
                 }
             }
         }
+        observerTokens.append(token)
     }
     
     private func updateNowPlayingInfo() {
@@ -382,53 +400,132 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
 
-    func importAudioFile(from url: URL){
-        guard url.startAccessingSecurityScopedResource() else {
-            print("failed to accesss file")
-            return
-        }
-        defer {url.stopAccessingSecurityScopedResource()}
-
-        let fileName = url.lastPathComponent
-        let destinationURL = fileDirectory.appendingPathComponent(fileName)
-
-        do {
-            if FileManager.default.fileExists(atPath: destinationURL.path()){
-                try FileManager.default.removeItem(at: destinationURL)
-            }
-            try FileManager.default.copyItem(at: url, to: destinationURL)
-            
-            Task {
-                let asset = AVURLAsset(url: destinationURL, options: nil)
-                do {
-                    let duration = try await asset.load(.duration)
-                    let durationInSeconds = Float(CMTimeGetSeconds(duration))
+    func importAudioFile(from url: URL) {
+        isImporting = true
+        importError = nil
+        
+        Task {
+            do {
+                guard url.startAccessingSecurityScopedResource() else {
+                    throw NSError(domain: "AudioImport", code: 1, userInfo: [NSLocalizedDescriptionKey: "No permission to access this file"])
+                }
+                
+                defer { url.stopAccessingSecurityScopedResource() }
+                
+                let originalFileName = url.lastPathComponent
+                let uniqueFileName = generateUniqueFileName(for: originalFileName)
+                let destinationURL = fileDirectory.appendingPathComponent(uniqueFileName)
+                
+                let fileCoordinator = NSFileCoordinator()
+                
+                let downloadedURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+                    var coordinationError: NSError?
                     
-                    let audioFile = AudioFile(fileName: fileName, fileURL: destinationURL, audioDuration: durationInSeconds)
-                    await MainActor.run {
-                        audioFiles.append(audioFile)
-                        saveAudioFiles()
-                        
-                        if let masterID = self.masterPlaylistID,
-                           let index = self.playlists.firstIndex(where: { $0.id == masterID }) {
-                            self.playlists[index].audioFileIDs.append(audioFile.id)
-                            self.displayedSongs = self.sortedAudioFiles
-                            self.savePlaylists()
-                        }
-                        
-                        if playbackQueue.count == audioFiles.count - 1 {
-                             playbackQueue = sortedAudioFiles
-                        }
+                    fileCoordinator.coordinate(readingItemAt: url, options: [.withoutChanges], error: &coordinationError) { coordinatedURL in
+                        continuation.resume(returning: coordinatedURL)
                     }
-                } catch {
-                    print("failed to load duration \(error)")
+                    
+                    if let error = coordinationError {
+                        continuation.resume(throwing: error)
+                    }
+                }
+                
+                try FileManager.default.copyItem(at: downloadedURL, to: destinationURL)
+                
+                let asset = AVURLAsset(url: destinationURL, options: nil)
+                let duration = try await asset.load(.duration)
+                let durationInSeconds = Float(CMTimeGetSeconds(duration))
+                
+                guard durationInSeconds > 0 && !durationInSeconds.isNaN && !durationInSeconds.isInfinite else {
+                    try? FileManager.default.removeItem(at: destinationURL)
+                    throw NSError(domain: "AudioImport", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid or corrupted audio file"])
+                }
+                
+                let audioFile = AudioFile(fileName: uniqueFileName, fileURL: destinationURL, audioDuration: durationInSeconds)
+                
+                await MainActor.run {
+                    audioFiles.append(audioFile)
+                    saveAudioFiles()
+                    
+                    if let masterID = self.masterPlaylistID,
+                       let index = self.playlists.firstIndex(where: { $0.id == masterID }) {
+                        self.playlists[index].audioFileIDs.append(audioFile.id)
+                        self.displayedSongs = self.sortedAudioFiles
+                        self.savePlaylists()
+                    }
+                    
+                    if playbackQueue.count == audioFiles.count - 1 {
+                        playbackQueue = sortedAudioFiles
+                    }
+                    
+                    isImporting = false
+                }
+                
+            } catch {
+                await MainActor.run {
+                    isImporting = false
+                    
+                    let nsError = error as NSError
+                    if nsError.domain == NSCocoaErrorDomain {
+                        switch nsError.code {
+                        case NSFileReadNoPermissionError:
+                            importError = "No permission to read this file"
+                        case NSFileReadNoSuchFileError:
+                            importError = "File not found or still downloading"
+                        case NSFileReadUnknownError:
+                            importError = "Cannot read this file type"
+                        default:
+                            importError = "Failed to import: \(error.localizedDescription)"
+                        }
+                    } else {
+                        importError = error.localizedDescription
+                    }
                 }
             }
-        } catch {
-            print("failed to import file \(error.localizedDescription)")
         }
     }
-
+    
+    private func generateUniqueFileName(for originalName: String) -> String {
+        let baseURL = fileDirectory.appendingPathComponent(originalName)
+        
+        if !FileManager.default.fileExists(atPath: baseURL.path()) {
+            return originalName
+        }
+        
+        let nameWithoutExtension = (originalName as NSString).deletingPathExtension
+        let fileExtension = (originalName as NSString).pathExtension
+        
+        var counter = 2
+        while true {
+            let newName = fileExtension.isEmpty
+                ? "\(nameWithoutExtension) \(counter)"
+                : "\(nameWithoutExtension) \(counter).\(fileExtension)"
+            
+            let newURL = fileDirectory.appendingPathComponent(newName)
+            
+            if !FileManager.default.fileExists(atPath: newURL.path()) {
+                return newName
+            }
+            
+            counter += 1
+        }
+    }
+    
+    private func cleanupOrphanedFiles() {
+        let trackedURLs = Set(audioFiles.map { $0.fileURL.lastPathComponent })
+        
+        guard let files = try? FileManager.default.contentsOfDirectory(at: fileDirectory, includingPropertiesForKeys: nil) else {
+            return
+        }
+        
+        for fileURL in files {
+            let fileName = fileURL.lastPathComponent
+            if fileName != "Artwork" && !trackedURLs.contains(fileName) {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+        }
+    }
+    
     func deleteAudioFile(_ audioFile: AudioFile){
         if currentlyPlayingID == audioFile.id {
             stop()
@@ -860,3 +957,4 @@ extension AudioManager: AVAudioPlayerDelegate{
         stopTimer()
     }
 }
+
