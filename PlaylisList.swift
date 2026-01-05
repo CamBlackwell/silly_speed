@@ -107,7 +107,7 @@ struct PlaylistDetailView: View {
         }
         .sheet(isPresented: $showingAudioArtworkPicker) {
             if let audioFile = artworkAudioFile {
-                PhotoPicker(audioManager: audioManager, audioFile: audioFile)
+                PhotoPicker{ (image: UIImage) in audioManager.setArtwork(image, for: audioFile)}
             }
         }
     }

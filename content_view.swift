@@ -134,10 +134,10 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingFilePicker) { DocumentPicker(audioManager: audioManager) }
             .sheet(isPresented: $showingAudioArtworkPicker) {
-                if let audioFile = artworkAudioFile { PhotoPicker(audioManager: audioManager, audioFile: audioFile) }
+                if let audioFile = artworkAudioFile { PhotoPicker { (image: UIImage) in audioManager.setArtwork(image, for: audioFile) } }
             }
             .sheet(isPresented: $showingPlaylistArtworkPicker) {
-                if let playlist = artworkPlaylist { PlaylistPhotoPicker(audioManager: audioManager, playlist: playlist) }
+                if let playlist = artworkPlaylist { PhotoPicker { (image: UIImage) in audioManager.setArtwork(image, for: playlist) } }
             }
             .alert("New Playlist", isPresented: $showingCreatePlaylistAlert) {
                 TextField("Playlist Name", text: $newPlaylistName)
@@ -663,57 +663,45 @@ struct DocumentPicker: UIViewControllerRepresentable {
 }
 
 struct PhotoPicker: UIViewControllerRepresentable {
-    let audioManager: AudioManager
-    let audioFile: AudioFile
-    @Environment(\.dismiss) var dismiss
+    let onImagePicked: (UIImage) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var config = PHPickerConfiguration(photoLibrary: .shared())
         config.filter = .images
+
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = context.coordinator
         return picker
     }
-    func updateUIViewController(_ ui: PHPickerViewController, context: Context) {}
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-    class Coordinator: NSObject, PHPickerViewControllerDelegate {
-        let parent: PhotoPicker
-        init(_ parent: PhotoPicker) { self.parent = parent }
+
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    final class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        private let parent: PhotoPicker
+
+        init(_ parent: PhotoPicker) {
+            self.parent = parent
+        }
+
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
             parent.dismiss()
+
             guard let result = results.first else { return }
+
             result.itemProvider.loadObject(ofClass: UIImage.self) { object, _ in
-                if let image = object as? UIImage {
-                    DispatchQueue.main.async { self.parent.audioManager.setArtwork(image, for: self.parent.audioFile) }
+                guard let image = object as? UIImage else { return }
+
+                DispatchQueue.main.async {
+                    self.parent.onImagePicked(image)
                 }
             }
         }
     }
 }
 
-struct PlaylistPhotoPicker: UIViewControllerRepresentable {
-    let audioManager: AudioManager
-    let playlist: Playlist
-    @Environment(\.dismiss) var dismiss
-    func makeUIViewController(context: Context) -> PHPickerViewController {
-        var config = PHPickerConfiguration()
-        config.filter = .images
-        let picker = PHPickerViewController(configuration: config)
-        picker.delegate = context.coordinator
-        return picker
-    }
-    func updateUIViewController(_ ui: PHPickerViewController, context: Context) {}
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-    class Coordinator: NSObject, PHPickerViewControllerDelegate {
-        let parent: PlaylistPhotoPicker
-        init(_ parent: PlaylistPhotoPicker) { self.parent = parent }
-        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            parent.dismiss()
-            guard let result = results.first else { return }
-            result.itemProvider.loadObject(ofClass: UIImage.self) { object, _ in
-                if let image = object as? UIImage {
-                    DispatchQueue.main.async { self.parent.audioManager.setArtwork(image, for: self.parent.playlist) }
-                }
-            }
-        }
-    }
-}
