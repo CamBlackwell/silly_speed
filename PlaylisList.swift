@@ -9,11 +9,10 @@ struct PlaylistDetailView: View {
     @Binding var showingRenameAlert: Bool
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
+    @Binding var artworkTarget: ArtworkTarget?
     @State private var isReorderMode = false
     @State private var showingShareSheet = false
     @State private var shareURL: URL?
-    @State private var showingAudioArtworkPicker = false
-    @State private var artworkAudioFile: AudioFile?
     
     var playlistSongs: [AudioFile] {
         audioManager.getAudioFiles(for: playlist)
@@ -55,8 +54,7 @@ struct PlaylistDetailView: View {
                                 isReorderMode: isReorderMode,
                                 showingShareSheet: $showingShareSheet,
                                 shareURL: $shareURL,
-                                showingAudioArtworkPicker: $showingAudioArtworkPicker,
-                                artworkAudioFile: $artworkAudioFile
+                                artworkTarget: $artworkTarget
                             )
                             .swipeActions {
                                 if !isReorderMode {
@@ -103,11 +101,6 @@ struct PlaylistDetailView: View {
         .sheet(isPresented: $showingShareSheet) {
             if let url = shareURL {
                 ShareSheet(activityItems: [url])
-            }
-        }
-        .sheet(isPresented: $showingAudioArtworkPicker) {
-            if let audioFile = artworkAudioFile {
-                PhotoPicker{ (image: UIImage) in audioManager.setArtwork(image, for: audioFile)}
             }
         }
     }

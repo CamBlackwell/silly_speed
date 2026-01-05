@@ -19,10 +19,7 @@ struct ContentView: View {
     @State private var isReorderMode = false
     @State private var showingShareSheet = false
     @State private var shareURL: URL?
-    @State private var showingAudioArtworkPicker = false
-    @State private var artworkAudioFile: AudioFile?
-    @State private var showingPlaylistArtworkPicker = false
-    @State private var artworkPlaylist: Playlist?
+    @State private var artworkTarget: ArtworkTarget?
     
     var body: some View {
         NavigationStack {
@@ -46,10 +43,7 @@ struct ContentView: View {
                             renamingPlaylist: $renamingPlaylist,
                             newPlaylistNameRename: $newPlaylistNameRename,
                             isReorderMode: $isReorderMode,
-                            showingAudioArtworkPicker: $showingAudioArtworkPicker,
-                            artworkAudioFile: $artworkAudioFile,
-                            showingPlaylistArtworkPicker: $showingPlaylistArtworkPicker,
-                            artworkPlaylist: $artworkPlaylist
+                            artworkTarget: $artworkTarget
                         )
                     }
                 }
@@ -133,11 +127,15 @@ struct ContentView: View {
                 }
             }
             .sheet(isPresented: $showingFilePicker) { DocumentPicker(audioManager: audioManager) }
-            .sheet(isPresented: $showingAudioArtworkPicker) {
-                if let audioFile = artworkAudioFile { PhotoPicker { (image: UIImage) in audioManager.setArtwork(image, for: audioFile) } }
-            }
-            .sheet(isPresented: $showingPlaylistArtworkPicker) {
-                if let playlist = artworkPlaylist { PhotoPicker { (image: UIImage) in audioManager.setArtwork(image, for: playlist) } }
+            .sheet(item: $artworkTarget) { target in
+                PhotoPicker { image in
+                    switch target {
+                    case .audioFile(let file):
+                        audioManager.setArtwork(image, for: file)
+                    case .playlist(let playlist):
+                        audioManager.setArtwork(image, for: playlist)
+                    }
+                }
             }
             .alert("New Playlist", isPresented: $showingCreatePlaylistAlert) {
                 TextField("Playlist Name", text: $newPlaylistName)
@@ -187,7 +185,6 @@ struct ContentView: View {
     }
 }
 
-// MARK: - LibraryListView
 struct LibraryListView: View {
     @ObservedObject var audioManager: AudioManager
     let filter: LibraryFilter
@@ -200,10 +197,7 @@ struct LibraryListView: View {
     @Binding var renamingPlaylist: Playlist?
     @Binding var newPlaylistNameRename: String
     @Binding var isReorderMode: Bool
-    @Binding var showingAudioArtworkPicker: Bool
-    @Binding var artworkAudioFile: AudioFile?
-    @Binding var showingPlaylistArtworkPicker: Bool
-    @Binding var artworkPlaylist: Playlist?
+    @Binding var artworkTarget: ArtworkTarget?
     
     var body: some View {
         switch filter {
@@ -216,8 +210,7 @@ struct LibraryListView: View {
                 renamingAudioFile: $renamingAudioFile,
                 newFileName: $newFileName,
                 isReorderMode: $isReorderMode,
-                showingAudioArtworkPicker: $showingAudioArtworkPicker,
-                artworkAudioFile: $artworkAudioFile
+                artworkTarget: $artworkTarget
             )
         case .playlists:
             PlaylistsListView(
@@ -230,14 +223,12 @@ struct LibraryListView: View {
                 showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
                 renamingPlaylist: $renamingPlaylist,
                 newPlaylistNameRename: $newPlaylistNameRename,
-                showingPlaylistArtworkPicker: $showingPlaylistArtworkPicker,
-                artworkPlaylist: $artworkPlaylist
+                artworkTarget: $artworkTarget
             )
         }
     }
 }
 
-// MARK: - SongsListView
 struct SongsListView: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
@@ -246,8 +237,7 @@ struct SongsListView: View {
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
     @Binding var isReorderMode: Bool
-    @Binding var showingAudioArtworkPicker: Bool
-    @Binding var artworkAudioFile: AudioFile?
+    @Binding var artworkTarget: ArtworkTarget?
     @Environment(\.editMode) private var editMode
     @State private var showingShareSheet = false
     @State private var shareURL: URL?
@@ -272,8 +262,7 @@ struct SongsListView: View {
                     isReorderMode: isReorderMode,
                     showingShareSheet: $showingShareSheet,
                     shareURL: $shareURL,
-                    showingAudioArtworkPicker: $showingAudioArtworkPicker,
-                    artworkAudioFile: $artworkAudioFile
+                    artworkTarget: $artworkTarget
                 )
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .listRowSeparator(.hidden)
@@ -294,7 +283,6 @@ struct SongsListView: View {
     }
 }
 
-// MARK: - PlaylistsListView
 struct PlaylistsListView: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
@@ -305,8 +293,7 @@ struct PlaylistsListView: View {
     @Binding var showingRenamePlaylistAlert: Bool
     @Binding var renamingPlaylist: Playlist?
     @Binding var newPlaylistNameRename: String
-    @Binding var showingPlaylistArtworkPicker: Bool
-    @Binding var artworkPlaylist: Playlist?
+    @Binding var artworkTarget: ArtworkTarget?
     
     var sortedPlaylists: [Playlist] { audioManager.playlists.sorted { $0.dateAdded > $1.dateAdded } }
     
@@ -322,7 +309,8 @@ struct PlaylistsListView: View {
                     selectedAudioFile: $selectedAudioFile,
                     showingRenameAlert: $showingRenameAlert,
                     renamingAudioFile: $renamingAudioFile,
-                    newFileName: $newFileName
+                    newFileName: $newFileName,
+                    artworkTarget: $artworkTarget
                 )) {
                     PlaylistRowView(playlist: playlist, audioManager: audioManager)
                 }
@@ -330,8 +318,7 @@ struct PlaylistsListView: View {
                 .listRowSeparator(.hidden)
                 .contextMenu {
                     Button(playlist.artworkImageName == nil ? "Set Artwork" : "Change Artwork", systemImage: "photo") {
-                        artworkPlaylist = playlist
-                        showingPlaylistArtworkPicker = true
+                        artworkTarget = .playlist(playlist)
                     }
                     if playlist.artworkImageName != nil {
                         Button("Remove Artwork", systemImage: "photo.badge.minus", role: .destructive) {
@@ -354,7 +341,6 @@ struct PlaylistsListView: View {
     }
 }
 
-// MARK: - MiniPlayerBar Implementation
 struct MiniPlayerBar: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
@@ -464,8 +450,6 @@ struct MiniPlayerBar: View {
 
 }
 
-
-// MARK: - Subviews & Helpers (Restored exact logic)
 struct PlaylistRowView: View {
     let playlist: Playlist
     @ObservedObject var audioManager: AudioManager
@@ -517,12 +501,11 @@ struct PlaylistRowView: View {
     }
 }
 
-
 struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "moon.zzz.fill").font(.system(size: 60)).foregroundStyle(.red.opacity(0.8))
-            Text("No audio Files .·°՞(¯□¯)՞°·.").font(.title2).fontWeight(.semibold).foregroundStyle(.red.opacity(0.8))
+            Text("No audio Files .·°ღ(¯`□´¯)ღ°·.").font(.title2).fontWeight(.semibold).foregroundStyle(.red.opacity(0.8))
             Text("press the + to add files").foregroundStyle(.red.opacity(0.8))
         }.frame(maxHeight: .infinity)
     }
@@ -541,8 +524,7 @@ struct AudioFileButton: View {
     var isReorderMode: Bool = false
     @Binding var showingShareSheet: Bool
     @Binding var shareURL: URL?
-    @Binding var showingAudioArtworkPicker: Bool
-    @Binding var artworkAudioFile: AudioFile?
+    @Binding var artworkTarget: ArtworkTarget?
 
     var body: some View {
         Button {
@@ -562,7 +544,7 @@ struct AudioFileButton: View {
         .buttonStyle(PlainButtonStyle())
         .contextMenu {
             if !isReorderMode {
-                AudioFileContextMenu(audioFile: audioFile, audioManager: audioManager, showingRenameAlert: $showingRenameAlert, renamingAudioFile: $renamingAudioFile, newFileName: $newFileName, showingShareSheet: $showingShareSheet, shareURL: $shareURL, showingAudioArtworkPicker: $showingAudioArtworkPicker, artworkAudioFile: $artworkAudioFile)
+                AudioFileContextMenu(audioFile: audioFile, audioManager: audioManager, showingRenameAlert: $showingRenameAlert, renamingAudioFile: $renamingAudioFile, newFileName: $newFileName, showingShareSheet: $showingShareSheet, shareURL: $shareURL, artworkTarget: $artworkTarget)
             }
         }
     }
@@ -612,16 +594,14 @@ struct AudioFileContextMenu: View {
     @Binding var newFileName: String
     @Binding var showingShareSheet: Bool
     @Binding var shareURL: URL?
-    @Binding var showingAudioArtworkPicker: Bool
-    @Binding var artworkAudioFile: AudioFile?
+    @Binding var artworkTarget: ArtworkTarget?
     var body: some View {
         Button("share this file", systemImage: "square.and.arrow.up") {
             shareURL = audioManager.urlForSharing(audioFile)
             showingShareSheet = true
         }
         Button(audioFile.artworkImageName == nil ? "Set Artwork" : "Change Artwork", systemImage: "photo") {
-            artworkAudioFile = audioFile
-            showingAudioArtworkPicker = true
+            artworkTarget = .audioFile(audioFile)
         }
         if audioFile.artworkImageName != nil {
             Button("Remove Artwork", systemImage: "photo.badge.minus", role: .destructive) { audioManager.removeArtwork(from: audioFile) }
@@ -704,4 +684,3 @@ struct PhotoPicker: UIViewControllerRepresentable {
         }
     }
 }
-

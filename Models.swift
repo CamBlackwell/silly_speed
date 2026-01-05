@@ -66,3 +66,15 @@ enum LibraryItem: Identifiable {
         }
     }
 }
+
+enum ArtworkTarget: Identifiable {
+    case audioFile(AudioFile)
+    case playlist(Playlist)
+    
+    var id: UUID {
+        switch self {
+        case .audioFile(let file): return file.id
+        case .playlist(let playlist): return playlist.id
+        }
+    }
+}
