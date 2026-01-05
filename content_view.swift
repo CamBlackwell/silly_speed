@@ -156,7 +156,7 @@ struct ContentView: View {
                     newFileName = ""
                 }
             } message: {
-                if let audioFile = renamingAudioFile { Text("Enter a new name for '\(audioFile.fileName)'") }
+                if let audioFile = renamingAudioFile { Text("Enter a new name for '\(audioFile.title)'") }
             }
             .alert("Rename Playlist", isPresented: $showingRenamePlaylistAlert) {
                 TextField("New Name", text: $newPlaylistNameRename)
@@ -360,7 +360,7 @@ struct MiniPlayerBar: View {
                         navigateToPlayer = true
                     } label: {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(audioFile.fileName)
+                            Text(audioFile.title)
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .lineLimit(1)
@@ -563,7 +563,7 @@ struct AudioFileRow: View {
                 Image(systemName: isCurrentlyPlaying ? "face.smiling.fill" : "face.smiling").foregroundStyle(isCurrentlyPlaying ? .red : .gray).font(.title2).frame(width: 50, height: 50)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(audioFile.fileName).font(.headline).foregroundStyle(isCurrentlyPlaying ? .red : .primary)
+                Text(audioFile.title).font(.headline).foregroundStyle(isCurrentlyPlaying ? .red : .primary)
                 HStack {
                     Text(audioFile.dateAdded, style: .date)
                     Text(formatTime(audioFile.audioDuration))
@@ -608,7 +608,7 @@ struct AudioFileContextMenu: View {
         }
         Button("rename", systemImage: "pencil.and.outline") {
             renamingAudioFile = audioFile
-            newFileName = audioFile.fileName
+            newFileName = audioFile.title
             showingRenameAlert = true
         }
         Menu {

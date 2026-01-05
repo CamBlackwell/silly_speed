@@ -15,7 +15,7 @@ struct AudioPlayerView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 8) {
-                Text(activeFile?.fileName ?? audioFile.fileName)
+                Text(activeFile?.title ?? audioFile.title)
                     .font(.title2)
                     .fontDesign(.serif)
                     .fontWeight(.heavy)

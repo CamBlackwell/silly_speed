@@ -332,7 +332,7 @@ class AudioManager: NSObject, ObservableObject {
         }
         
         var nowPlayingInfo = [String: Any]()
-        nowPlayingInfo[MPMediaItemPropertyTitle] = currentFile.fileName
+        nowPlayingInfo[MPMediaItemPropertyTitle] = currentFile.title
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
         nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
@@ -570,20 +570,15 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     
-    func renameAudioFile(_ audioFile: AudioFile, to newName: String) {
-        guard let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) else { return }
-        
-        let updatedAudioFile = AudioFile(
-            id: audioFile.id,
-            fileName: newName,
-            fileURL: audioFile.fileURL,
-            dateAdded: audioFile.dateAdded,
-            audioDuration: audioFile.audioDuration,
-            artworkImageName: audioFile.artworkImageName
-        )
-        
-        audioFiles[index] = updatedAudioFile
-        saveAudioFiles()
+    func renameAudioFile(_ audioFile: AudioFile, to newTitle: String) {
+        if let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) {
+            var updatedFile = audioFiles[index]
+            updatedFile.title = newTitle
+            audioFiles[index] = updatedFile
+            saveAudioFiles()
+            
+            displayedSongs = sortedAudioFiles
+        }
     }
     
     func urlForSharing(_ audioFile: AudioFile) -> URL? {
@@ -685,7 +680,8 @@ class AudioManager: NSObject, ObservableObject {
             fileURL: audioFile.fileURL,
             dateAdded: audioFile.dateAdded,
             audioDuration: audioFile.audioDuration,
-            artworkImageName: newFilename
+            artworkImageName: newFilename,
+            title: audioFile.title
         )
         
         audioFiles[index] = updatedFile
@@ -719,7 +715,8 @@ class AudioManager: NSObject, ObservableObject {
             fileURL: audioFile.fileURL,
             dateAdded: audioFile.dateAdded,
             audioDuration: audioFile.audioDuration,
-            artworkImageName: nil
+            artworkImageName: nil,
+            title: audioFile.title
         )
         
         audioFiles[index] = updatedFile
