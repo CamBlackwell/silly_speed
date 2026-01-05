@@ -292,6 +292,14 @@ class AudioManager: NSObject, ObservableObject {
         nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? Double(tempo) : 0.0
         
+        if let artworkName = currentFile.artworkImageName,
+           let artworkImage = loadArtworkImage(artworkName) {
+            let artwork = MPMediaItemArtwork(boundsSize: artworkImage.size) { size in
+                return artworkImage
+            }
+            nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
+        }
+        
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
     
