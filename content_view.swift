@@ -469,22 +469,54 @@ struct MiniPlayerBar: View {
 struct PlaylistRowView: View {
     let playlist: Playlist
     @ObservedObject var audioManager: AudioManager
-    var playlistSongs: [AudioFile] { audioManager.getAudioFiles(for: playlist) }
+
+    var artworkImage: UIImage? {
+        guard
+            let currentPlaylist = audioManager.playlists.first(where: { $0.id == playlist.id }),
+            let artworkName = currentPlaylist.artworkImageName
+        else {
+            return nil
+        }
+
+        return audioManager.loadArtworkImage(artworkName)
+    }
+
+    var playlistSongs: [AudioFile] {
+        audioManager.getAudioFiles(for: playlist)
+    }
+
     var body: some View {
         HStack {
-            if let artworkName = playlist.artworkImageName, let image = audioManager.loadArtworkImage(artworkName) {
-                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill).frame(width: 50, height: 50).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
+            if let image = artworkImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 50, height: 50)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             } else {
-                Image(systemName: "music.note.list").font(.title2).foregroundStyle(.red).frame(width: 30)
+                Image(systemName: "music.note.list")
+                    .font(.title2)
+                    .foregroundStyle(.red)
+                    .frame(width: 30)
             }
+
             VStack(alignment: .leading) {
-                Text(playlist.name).font(.headline).foregroundStyle(.white)
-                Text("\(playlistSongs.count) songs").font(.caption).foregroundStyle(.gray)
+                Text(playlist.name)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+
+                Text("\(playlistSongs.count) songs")
+                    .font(.caption)
+                    .foregroundStyle(.gray)
             }
+
             Spacer()
-        }.padding(.vertical, 8)
+        }
+        .padding(.vertical, 8)
     }
 }
+
 
 struct EmptyStateView: View {
     var body: some View {
