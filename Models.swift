@@ -6,7 +6,8 @@ struct AudioFile: Identifiable, Codable {
     let fileURL: URL
     let dateAdded: Date
     let audioDuration: Float
-    let artworkImageName: String?
+    var artworkImageName: String?
+    var title: String
     
     init(fileName: String, fileURL: URL, audioDuration: Float, artworkImageName: String? = nil) {
         self.id = UUID()
@@ -15,15 +16,16 @@ struct AudioFile: Identifiable, Codable {
         self.dateAdded = Date()
         self.audioDuration = audioDuration
         self.artworkImageName = artworkImageName
-    }
+        self.title = (fileName as NSString).deletingPathExtension     }
     
-    init(id: UUID, fileName: String, fileURL: URL, dateAdded: Date, audioDuration: Float, artworkImageName: String? = nil) {
+    init(id: UUID, fileName: String, fileURL: URL, dateAdded: Date, audioDuration: Float, artworkImageName: String? = nil, title: String? = nil) {
         self.id = id
         self.fileName = fileName
         self.fileURL = fileURL
         self.dateAdded = dateAdded
         self.audioDuration = audioDuration
         self.artworkImageName = artworkImageName
+        self.title = title ?? fileName
     }
 }
 
