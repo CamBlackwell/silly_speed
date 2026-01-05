@@ -80,6 +80,33 @@ class AudioManager: NSObject, ObservableObject {
         setupConfigurationChangeObserver()
         
         self.playbackQueue = self.sortedAudioFiles
+        
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            
+            //only deactivate if we're paused and exit app
+            if !self.isPlaying {
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            }
+            self.updateNowPlayingInfo()
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // Reactivate session when returning to foreground if we have a current track
+            if self.currentlyPlayingID != nil {
+                try? AVAudioSession.sharedInstance().setActive(true)
+            }
+        }
     }
     
     private func loadVisualisationMode() {
@@ -290,7 +317,7 @@ class AudioManager: NSObject, ObservableObject {
         nowPlayingInfo[MPMediaItemPropertyTitle] = currentFile.fileName
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
         nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
-        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? Double(tempo) : 0.0
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         
         if let artworkName = currentFile.artworkImageName,
            let artworkImage = loadArtworkImage(artworkName) {
