@@ -6,21 +6,24 @@ struct AudioFile: Identifiable, Codable {
     let fileURL: URL
     let dateAdded: Date
     let audioDuration: Float
+    let artworkImageName: String?
     
-    init(fileName: String, fileURL: URL, audioDuration: Float) {
+    init(fileName: String, fileURL: URL, audioDuration: Float, artworkImageName: String? = nil) {
         self.id = UUID()
         self.fileName = fileName
         self.fileURL = fileURL
         self.dateAdded = Date()
         self.audioDuration = audioDuration
+        self.artworkImageName = artworkImageName
     }
     
-    init(id: UUID, fileName: String, fileURL: URL, dateAdded: Date, audioDuration: Float) {
+    init(id: UUID, fileName: String, fileURL: URL, dateAdded: Date, audioDuration: Float, artworkImageName: String? = nil) {
         self.id = id
         self.fileName = fileName
         self.fileURL = fileURL
         self.dateAdded = dateAdded
         self.audioDuration = audioDuration
+        self.artworkImageName = artworkImageName
     }
 }
 
@@ -29,12 +32,14 @@ struct Playlist: Identifiable, Codable {
     var name: String
     var audioFileIDs: [UUID]
     let dateAdded: Date
+    var artworkImageName: String?
     
-    init(name: String) {
+    init(name: String, artworkImageName: String? = nil) {
         self.id = UUID()
         self.name = name
         self.audioFileIDs = []
         self.dateAdded = Date()
+        self.artworkImageName = artworkImageName
     }
 }
 

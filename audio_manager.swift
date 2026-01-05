@@ -4,6 +4,23 @@ import Combine
 import MediaPlayer
 import SwiftUI
 
+enum VisualisationMode: String, Codable, CaseIterable {
+    case both
+    case spectrumOnly
+    case goniometerOnly
+    case albumArt
+
+    var icon: String {
+        switch self {
+        case .both: return "square.grid.2x2"
+        case .spectrumOnly: return "waveform"
+        case .goniometerOnly: return "circle.grid.cross"
+        case .albumArt: return "photo"
+        }
+    }
+}
+
+
 class AudioManager: NSObject, ObservableObject {
     @Published var audioFiles: [AudioFile] = []
     @Published var playlists: [Playlist] = []
@@ -16,17 +33,18 @@ class AudioManager: NSObject, ObservableObject {
     @Published var selectedAlgorithm: PitchAlgorithm = .apple
     @Published var audioAnalyzer = UnifiedAudioAnalyser()
     @Published var isLooping: Bool = false
-    @Published var visualizationMode: VisualizationMode = .both
+    @Published var visualisationMode: VisualisationMode = .both
     @Published var playingFromSongsTab: Bool = false
     @Published var displayedSongs: [AudioFile] = []
 
     private var currentEngine: AudioEngineProtocol?
     private var timer: Timer?
     private let fileDirectory: URL
+    private let artworkDirectory: URL
     private let audioFilesKey = "savedAudioFiles"
     private let playlistsKey = "savedPlaylists"
     private let algorithmKey = "selectedAlgorithm"
-    private let visualizationModeKey = "visualizationMode"
+    private let visualisationModeKey = "visualisationMode"
     private var isSeeking = false
     private let masterPlaylistKey = "masterPlaylistID"
     private var masterPlaylistID: UUID?
@@ -46,13 +64,15 @@ class AudioManager: NSObject, ObservableObject {
 
     override init() {
         self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        self.artworkDirectory = fileDirectory.appendingPathComponent("Artwork", isDirectory: true)
         super.init()
+        try? FileManager.default.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
         loadAudioFiles()
         loadPlaylists()
         loadOrCreateMasterPlaylist()
         self.displayedSongs = self.sortedAudioFiles
         loadSelectedAlgorithm()
-        loadVisualizationMode()
+        loadVisualisationMode()
         setupAudioSession()
         initialiseEngine()
         setupInterruptionObserver()
@@ -62,15 +82,15 @@ class AudioManager: NSObject, ObservableObject {
         self.playbackQueue = self.sortedAudioFiles
     }
     
-    private func loadVisualizationMode() {
-        if let saved = UserDefaults.standard.string(forKey: visualizationModeKey),
-           let mode = VisualizationMode(rawValue: saved) {
-            visualizationMode = mode
+    private func loadVisualisationMode() {
+        if let saved = UserDefaults.standard.string(forKey: visualisationModeKey),
+           let mode = VisualisationMode(rawValue: saved) {
+            visualisationMode = mode
         }
     }
-    
-    func saveVisualizationMode() {
-        UserDefaults.standard.set(visualizationMode.rawValue, forKey: visualizationModeKey)
+
+    func saveVisualisationMode() {
+        UserDefaults.standard.set(visualisationMode.rawValue, forKey: visualisationModeKey)
     }
     
     private func setupConfigurationChangeObserver() {
@@ -99,6 +119,7 @@ class AudioManager: NSObject, ObservableObject {
             selectedAlgorithm = algorithm
         }
     }
+    
     private func loadOrCreateMasterPlaylist() {
         if let data = UserDefaults.standard.data(forKey: masterPlaylistKey),
            let id = try? JSONDecoder().decode(UUID.self, from: data),
@@ -121,7 +142,6 @@ class AudioManager: NSObject, ObservableObject {
             }
         }
     }
-
 
     func reorderSongs(from source: IndexSet, to destination: Int) {
         displayedSongs.move(fromOffsets: source, toOffset: destination)
@@ -384,6 +404,7 @@ class AudioManager: NSObject, ObservableObject {
             print("failed to delete file \(error.localizedDescription)")
         }
         audioFiles.removeAll{$0.id == audioFile.id}
+        deleteArtworkIfUnused(audioFile.artworkImageName)
         saveAudioFiles()
         displayedSongs = sortedAudioFiles
         
@@ -425,7 +446,8 @@ class AudioManager: NSObject, ObservableObject {
             fileName: newName,
             fileURL: audioFile.fileURL,
             dateAdded: audioFile.dateAdded,
-            audioDuration: audioFile.audioDuration
+            audioDuration: audioFile.audioDuration,
+            artworkImageName: audioFile.artworkImageName
         )
         
         audioFiles[index] = updatedAudioFile
@@ -436,7 +458,6 @@ class AudioManager: NSObject, ObservableObject {
         audioFile.fileURL
     }
 
-    
     func createPlaylist(name: String) {
         let newPlaylist = Playlist(name: name)
         playlists.append(newPlaylist)
@@ -445,6 +466,7 @@ class AudioManager: NSObject, ObservableObject {
     
     func deletePlaylist(_ playlist: Playlist) {
         playlists.removeAll { $0.id == playlist.id }
+        deleteArtworkIfUnused(playlist.artworkImageName)
         savePlaylists()
     }
     
@@ -489,6 +511,111 @@ class AudioManager: NSObject, ObservableObject {
             playlists = try JSONDecoder().decode([Playlist].self, from: data)
         } catch {
             print("failed to load playlists \(error.localizedDescription)")
+        }
+    }
+    
+    func saveArtwork(from image: UIImage) -> String? {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else { return nil }
+        let filename = "artwork_\(UUID().uuidString).jpg"
+        let fileURL = artworkDirectory.appendingPathComponent(filename)
+        
+        do {
+            if !FileManager.default.fileExists(atPath: artworkDirectory.path) {
+                try FileManager.default.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
+            }
+            try imageData.write(to: fileURL)
+            return filename
+        } catch {
+            print("Failed to save artwork: \(error)")
+            return nil
+        }
+    }
+    
+    func loadArtworkImage(_ imageName: String) -> UIImage? {
+        let imageURL = artworkDirectory.appendingPathComponent(imageName)
+        if let data = try? Data(contentsOf: imageURL) {
+            return UIImage(data: data)
+        }
+        return nil
+    }
+
+
+    func setArtwork(_ image: UIImage, for audioFile: AudioFile) {
+        guard let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) else { return }
+        
+        let oldArtwork = audioFiles[index].artworkImageName
+        
+        guard let newFilename = saveArtwork(from: image) else { return }
+        
+        let updatedFile = AudioFile(
+            id: audioFile.id,
+            fileName: audioFile.fileName,
+            fileURL: audioFile.fileURL,
+            dateAdded: audioFile.dateAdded,
+            audioDuration: audioFile.audioDuration,
+            artworkImageName: newFilename
+        )
+        
+        audioFiles[index] = updatedFile
+        displayedSongs = sortedAudioFiles
+        saveAudioFiles()
+        
+        deleteArtworkIfUnused(oldArtwork)
+    }
+
+    func setArtwork(_ image: UIImage, for playlist: Playlist) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+        
+        let oldArtwork = playlists[index].artworkImageName
+        
+        guard let newFilename = saveArtwork(from: image) else { return }
+        
+        playlists[index].artworkImageName = newFilename
+        savePlaylists()
+        
+        deleteArtworkIfUnused(oldArtwork)
+    }
+
+    func removeArtwork(from audioFile: AudioFile) {
+        guard let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) else { return }
+        
+        let oldArtwork = audioFiles[index].artworkImageName
+        
+        let updatedFile = AudioFile(
+            id: audioFile.id,
+            fileName: audioFile.fileName,
+            fileURL: audioFile.fileURL,
+            dateAdded: audioFile.dateAdded,
+            audioDuration: audioFile.audioDuration,
+            artworkImageName: nil
+        )
+        
+        audioFiles[index] = updatedFile
+        saveAudioFiles()
+        
+        deleteArtworkIfUnused(oldArtwork)
+    }
+
+    func removeArtwork(from playlist: Playlist) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+        
+        let oldArtwork = playlists[index].artworkImageName
+        
+        playlists[index].artworkImageName = nil
+        savePlaylists()
+        
+        deleteArtworkIfUnused(oldArtwork)
+    }
+
+    private func deleteArtworkIfUnused(_ imageName: String?) {
+        guard let imageName = imageName else { return }
+        
+        let audioFileUsage = audioFiles.filter { $0.artworkImageName == imageName }.count
+        let playlistUsage = playlists.filter { $0.artworkImageName == imageName }.count
+        
+        if audioFileUsage == 0 && playlistUsage == 0 {
+            let fileURL = artworkDirectory.appendingPathComponent(imageName)
+            try? FileManager.default.removeItem(at: fileURL)
         }
     }
 
@@ -589,7 +716,6 @@ class AudioManager: NSObject, ObservableObject {
             self?.isSeeking = false
         }
     }
-    
 
     func setVolume(_ volume: Float){
         currentEngine?.setVolume(volume)
@@ -662,7 +788,6 @@ class AudioManager: NSObject, ObservableObject {
         updateNowPlayingInfo()
     }
     
-    
     func skipNextSong(){
         stopTimer()
         guard !playbackQueue.isEmpty else {
@@ -690,6 +815,7 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
 }
+
 
 extension AudioManager: AVAudioPlayerDelegate{
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool){

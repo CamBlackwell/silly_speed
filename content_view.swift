@@ -1,12 +1,12 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import PhotosUI
 
 struct ContentView: View {
     @StateObject private var audioManager = AudioManager()
     @State private var showingFilePicker = false
     @State private var navigateToPlayer = false
     @State private var selectedAudioFile: AudioFile?
-    
     @State private var libraryFilter: LibraryFilter = .songs
     @State private var showingCreatePlaylistAlert = false
     @State private var newPlaylistName = ""
@@ -19,10 +19,14 @@ struct ContentView: View {
     @State private var isReorderMode = false
     @State private var showingShareSheet = false
     @State private var shareURL: URL?
+    @State private var showingAudioArtworkPicker = false
+    @State private var artworkAudioFile: AudioFile?
+    @State private var showingPlaylistArtworkPicker = false
+    @State private var artworkPlaylist: Playlist?
     
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .bottom) {
                 Color(red: 0.15, green: 0.15, blue: 0.15)
                     .ignoresSafeArea()
                 
@@ -41,17 +45,23 @@ struct ContentView: View {
                             showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
                             renamingPlaylist: $renamingPlaylist,
                             newPlaylistNameRename: $newPlaylistNameRename,
-                            isReorderMode: $isReorderMode
+                            isReorderMode: $isReorderMode,
+                            showingAudioArtworkPicker: $showingAudioArtworkPicker,
+                            artworkAudioFile: $artworkAudioFile,
+                            showingPlaylistArtworkPicker: $showingPlaylistArtworkPicker,
+                            artworkPlaylist: $artworkPlaylist
                         )
                     }
-                    
-                    if audioManager.currentlyPlayingID != nil {
-                        MiniPlayerBar(
-                            audioManager: audioManager,
-                            navigateToPlayer: $navigateToPlayer,
-                            selectedAudioFile: $selectedAudioFile
-                        )
-                    }
+                }
+                
+                if audioManager.currentlyPlayingID != nil {
+                    MiniPlayerBar(
+                        audioManager: audioManager,
+                        navigateToPlayer: $navigateToPlayer,
+                        selectedAudioFile: $selectedAudioFile
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(2)
                 }
                 
                 VStack {
@@ -72,8 +82,6 @@ struct ContentView: View {
                             .padding(.vertical, 8)
                             .background(.ultraThinMaterial)
                             .clipShape(Capsule())
-                            .glassEffect()
-                            .foregroundStyle(.clear)
                         }
                         .buttonStyle(PlainButtonStyle())
                         .padding(.leading, 20)
@@ -98,24 +106,13 @@ struct ContentView: View {
                             .padding(.top, 10)
                         } else {
                             Menu {
-                                Button {
-                                    showingFilePicker = true
-                                } label: {
-                                    Label("Add Songs", systemImage: "music.note.list")
-                                }
+                                Button { showingFilePicker = true } label: { Label("Add Songs", systemImage: "music.note.list") }
                                 Button {
                                     newPlaylistName = ""
                                     showingCreatePlaylistAlert = true
-                                } label: {
-                                    Label("Create Playlist", systemImage: "text.badge.plus")
-                                }
-                                
+                                } label: { Label("Create Playlist", systemImage: "text.badge.plus") }
                                 if libraryFilter == .songs {
-                                    Button {
-                                        isReorderMode = true
-                                    } label: {
-                                        Label("Reorder Songs", systemImage: "arrow.up.arrow.down")
-                                    }
+                                    Button { isReorderMode = true } label: { Label("Reorder Songs", systemImage: "arrow.up.arrow.down") }
                                 }
                             } label: {
                                 ZStack {
@@ -123,9 +120,6 @@ struct ContentView: View {
                                         .fill(.ultraThinMaterial)
                                         .opacity(0.50)
                                         .frame(width: 60, height: 60)
-                                        .glassEffect()
-                                        .foregroundStyle(.clear)
-                                    
                                     Image(systemName: "plus")
                                         .font(.system(size: 24, weight: .semibold))
                                         .foregroundStyle(.red)
@@ -135,21 +129,20 @@ struct ContentView: View {
                             .padding(.top, 10)
                         }
                     }
-                    
                     Spacer()
                 }
             }
-            .sheet(isPresented: $showingFilePicker) {
-                DocumentPicker(audioManager: audioManager)
+            .sheet(isPresented: $showingFilePicker) { DocumentPicker(audioManager: audioManager) }
+            .sheet(isPresented: $showingAudioArtworkPicker) {
+                if let audioFile = artworkAudioFile { PhotoPicker(audioManager: audioManager, audioFile: audioFile) }
+            }
+            .sheet(isPresented: $showingPlaylistArtworkPicker) {
+                if let playlist = artworkPlaylist { PlaylistPhotoPicker(audioManager: audioManager, playlist: playlist) }
             }
             .alert("New Playlist", isPresented: $showingCreatePlaylistAlert) {
                 TextField("Playlist Name", text: $newPlaylistName)
                 Button("Cancel", role: .cancel) { }
-                Button("Create") {
-                    if !newPlaylistName.isEmpty {
-                        audioManager.createPlaylist(name: newPlaylistName)
-                    }
-                }
+                Button("Create") { if !newPlaylistName.isEmpty { audioManager.createPlaylist(name: newPlaylistName) } }
             }
             .alert("Rename File", isPresented: $showingRenameAlert) {
                 TextField("New Name", text: $newFileName)
@@ -165,9 +158,7 @@ struct ContentView: View {
                     newFileName = ""
                 }
             } message: {
-                if let audioFile = renamingAudioFile {
-                    Text("Enter a new name for '\(audioFile.fileName)'")
-                }
+                if let audioFile = renamingAudioFile { Text("Enter a new name for '\(audioFile.fileName)'") }
             }
             .alert("Rename Playlist", isPresented: $showingRenamePlaylistAlert) {
                 TextField("New Name", text: $newPlaylistNameRename)
@@ -183,9 +174,7 @@ struct ContentView: View {
                     newPlaylistNameRename = ""
                 }
             } message: {
-                if let playlist = renamingPlaylist {
-                    Text("Enter a new name for '\(playlist.name)'")
-                }
+                if let playlist = renamingPlaylist { Text("Enter a new name for '\(playlist.name)'") }
             }
             .navigationDestination(isPresented: $navigateToPlayer) {
                 if let audioFile = selectedAudioFile {
@@ -198,6 +187,7 @@ struct ContentView: View {
     }
 }
 
+// MARK: - LibraryListView
 struct LibraryListView: View {
     @ObservedObject var audioManager: AudioManager
     let filter: LibraryFilter
@@ -210,7 +200,10 @@ struct LibraryListView: View {
     @Binding var renamingPlaylist: Playlist?
     @Binding var newPlaylistNameRename: String
     @Binding var isReorderMode: Bool
-    
+    @Binding var showingAudioArtworkPicker: Bool
+    @Binding var artworkAudioFile: AudioFile?
+    @Binding var showingPlaylistArtworkPicker: Bool
+    @Binding var artworkPlaylist: Playlist?
     
     var body: some View {
         switch filter {
@@ -222,7 +215,9 @@ struct LibraryListView: View {
                 showingRenameAlert: $showingRenameAlert,
                 renamingAudioFile: $renamingAudioFile,
                 newFileName: $newFileName,
-                isReorderMode: $isReorderMode
+                isReorderMode: $isReorderMode,
+                showingAudioArtworkPicker: $showingAudioArtworkPicker,
+                artworkAudioFile: $artworkAudioFile
             )
         case .playlists:
             PlaylistsListView(
@@ -234,12 +229,15 @@ struct LibraryListView: View {
                 newFileName: $newFileName,
                 showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
                 renamingPlaylist: $renamingPlaylist,
-                newPlaylistNameRename: $newPlaylistNameRename
+                newPlaylistNameRename: $newPlaylistNameRename,
+                showingPlaylistArtworkPicker: $showingPlaylistArtworkPicker,
+                artworkPlaylist: $artworkPlaylist
             )
         }
     }
 }
 
+// MARK: - SongsListView
 struct SongsListView: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
@@ -248,21 +246,17 @@ struct SongsListView: View {
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
     @Binding var isReorderMode: Bool
+    @Binding var showingAudioArtworkPicker: Bool
+    @Binding var artworkAudioFile: AudioFile?
     @Environment(\.editMode) private var editMode
-
     @State private var showingShareSheet = false
     @State private var shareURL: URL?
 
-    var sortedSongs: [AudioFile] {
-        audioManager.displayedSongs
-    }
+    var sortedSongs: [AudioFile] { audioManager.displayedSongs }
 
     var body: some View {
         List {
-            Color.clear
-                .frame(height: 30)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+            Color.clear.frame(height: 70).listRowBackground(Color.clear).listRowSeparator(.hidden)
 
             ForEach(sortedSongs, id: \.id) { audioFile in
                 AudioFileButton(
@@ -277,7 +271,9 @@ struct SongsListView: View {
                     isFromSongsTab: true,
                     isReorderMode: isReorderMode,
                     showingShareSheet: $showingShareSheet,
-                    shareURL: $shareURL
+                    shareURL: $shareURL,
+                    showingAudioArtworkPicker: $showingAudioArtworkPicker,
+                    artworkAudioFile: $artworkAudioFile
                 )
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .listRowSeparator(.hidden)
@@ -285,20 +281,20 @@ struct SongsListView: View {
             .onMove { source, destination in
                 audioManager.reorderSongs(from: source, to: destination)
             }
+            
+            Color.clear.frame(height: 80).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))
         .environment(\.editMode, isReorderMode ? .constant(.active) : .constant(.inactive))
         .sheet(isPresented: $showingShareSheet) {
-            if let url = shareURL {
-                ShareSheet(activityItems: [url])
-            }
+            if let url = shareURL { ShareSheet(activityItems: [url]) }
         }
     }
 }
 
-
+// MARK: - PlaylistsListView
 struct PlaylistsListView: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
@@ -309,17 +305,14 @@ struct PlaylistsListView: View {
     @Binding var showingRenamePlaylistAlert: Bool
     @Binding var renamingPlaylist: Playlist?
     @Binding var newPlaylistNameRename: String
+    @Binding var showingPlaylistArtworkPicker: Bool
+    @Binding var artworkPlaylist: Playlist?
     
-    var sortedPlaylists: [Playlist] {
-        audioManager.playlists.sorted { $0.dateAdded > $1.dateAdded }
-    }
+    var sortedPlaylists: [Playlist] { audioManager.playlists.sorted { $0.dateAdded > $1.dateAdded } }
     
     var body: some View {
         List {
-            Color.clear
-                .frame(height: 30)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+            Color.clear.frame(height: 70).listRowBackground(Color.clear).listRowSeparator(.hidden)
             
             ForEach(sortedPlaylists) { playlist in
                 NavigationLink(destination: PlaylistDetailView(
@@ -336,26 +329,24 @@ struct PlaylistsListView: View {
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .listRowSeparator(.hidden)
                 .contextMenu {
+                    Button(playlist.artworkImageName == nil ? "Set Artwork" : "Change Artwork", systemImage: "photo") {
+                        artworkPlaylist = playlist
+                        showingPlaylistArtworkPicker = true
+                    }
+                    if playlist.artworkImageName != nil {
+                        Button("Remove Artwork", systemImage: "photo.badge.minus", role: .destructive) {
+                            audioManager.removeArtwork(from: playlist)
+                        }
+                    }
                     Button("rename", systemImage: "pencil.and.outline") {
                         renamingPlaylist = playlist
                         newPlaylistNameRename = playlist.name
                         showingRenamePlaylistAlert = true
                     }
-                    
-                    Button(role: .destructive) {
-                        audioManager.deletePlaylist(playlist)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
-                .swipeActions {
-                    Button(role: .destructive) {
-                        audioManager.deletePlaylist(playlist)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
+                    Button(role: .destructive) { audioManager.deletePlaylist(playlist) } label: { Label("Delete", systemImage: "trash") }
                 }
             }
+            Color.clear.frame(height: 80).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -363,239 +354,7 @@ struct PlaylistsListView: View {
     }
 }
 
-struct PlaylistRowView: View {
-    let playlist: Playlist
-    @ObservedObject var audioManager: AudioManager
-    
-    var playlistSongs: [AudioFile] {
-        audioManager.getAudioFiles(for: playlist)
-    }
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "music.note.list")
-                .font(.title2)
-                .foregroundStyle(.red)
-                .frame(width: 30)
-            
-            VStack(alignment: .leading) {
-                Text(playlist.name)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Text("\(playlistSongs.count) songs")
-                    .font(.caption)
-                    .foregroundStyle(.gray)
-            }
-            
-            Spacer()
-            
-        }
-        .padding(.vertical, 8)
-    }
-}
-
-struct EmptyStateView: View {
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "moon.zzz.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.red.opacity(0.8))
-           
-            Text("No audio Files .·°՞(¯□¯)՞°·.")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.red.opacity(0.8))
-           
-            Text("press the + to add files")
-                .foregroundStyle(.red.opacity(0.8))
-        }
-        .frame(maxHeight: .infinity)
-    }
-}
-
-struct AudioFileButton: View {
-    let audioFile: AudioFile
-    @ObservedObject var audioManager: AudioManager
-    @Binding var navigateToPlayer: Bool
-    @Binding var selectedAudioFile: AudioFile?
-    @Binding var showingRenameAlert: Bool
-    @Binding var renamingAudioFile: AudioFile?
-    @Binding var newFileName: String
-
-    var context: [AudioFile]? = nil
-    var isFromSongsTab: Bool = false
-    var isReorderMode: Bool = false
-
-    @Binding var showingShareSheet: Bool
-    @Binding var shareURL: URL?
-
-    var body: some View {
-        Button {
-            if !isReorderMode {
-                let isSameSong = audioManager.currentlyPlayingID == audioFile.id
-                let isSameContext = audioManager.playingFromSongsTab == isFromSongsTab
-
-                if isSameSong && isSameContext {
-                    selectedAudioFile = audioFile
-                    navigateToPlayer = true
-                } else {
-                    audioManager.play(audioFile: audioFile, context: context, fromSongsTab: isFromSongsTab)
-                }
-            }
-        } label: {
-            AudioFileRow(
-                audioFile: audioFile,
-                isCurrentlyPlaying: audioManager.currentlyPlayingID == audioFile.id && audioManager.playingFromSongsTab == isFromSongsTab
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .contextMenu {
-            if !isReorderMode {
-                AudioFileContextMenu(
-                    audioFile: audioFile,
-                    audioManager: audioManager,
-                    showingRenameAlert: $showingRenameAlert,
-                    renamingAudioFile: $renamingAudioFile,
-                    newFileName: $newFileName,
-                    showingShareSheet: $showingShareSheet,
-                    shareURL: $shareURL
-                )
-            }
-        }
-    }
-}
-
-struct ShareSheet: UIViewControllerRepresentable {
-    let activityItems: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
-}
-
-
-struct AudioFileContextMenu: View {
-    let audioFile: AudioFile
-    @ObservedObject var audioManager: AudioManager
-    @Binding var showingRenameAlert: Bool
-    @Binding var renamingAudioFile: AudioFile?
-    @Binding var newFileName: String
-    @Binding var showingShareSheet: Bool
-    @Binding var shareURL: URL?
-
-    var body: some View {
-        Button("share this file", systemImage: "square.and.arrow.up") {
-            shareURL = audioManager.urlForSharing(audioFile)
-            showingShareSheet = true
-        }
-
-        Button("rename", systemImage: "pencil.and.outline") {
-            renamingAudioFile = audioFile
-            newFileName = audioFile.fileName
-            showingRenameAlert = true
-        }
-
-        Menu {
-            ForEach(audioManager.playlists) { playlist in
-                Button(playlist.name) {
-                    audioManager.addAudioFile(audioFile, to: playlist)
-                }
-            }
-        } label: {
-            Label("Add to Playlist", systemImage: "plus")
-        }
-
-        Button(role: .destructive) {
-            audioManager.deleteAudioFile(audioFile)
-        } label: {
-            Label("Delete via Menu", systemImage: "trash")
-        }
-    }
-}
-
-
-
-
-struct AudioFileRow: View {
-    let audioFile: AudioFile
-    let isCurrentlyPlaying: Bool
-
-    var body: some View {
-        HStack {
-            Image(systemName: isCurrentlyPlaying ?  "face.smiling.fill" : "face.smiling")
-            .foregroundStyle(isCurrentlyPlaying ? .red : .gray)
-            .font(.title2)
-
-            VStack(alignment: .leading, spacing: 4){
-                Text(audioFile.fileName)
-                    .font(.headline)
-                    .foregroundStyle(isCurrentlyPlaying ? .red : .gray)
-                
-                HStack{
-                    Text(audioFile.dateAdded, style: .date)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(formatTime(audioFile.audioDuration))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if isCurrentlyPlaying{
-                Image(systemName: "speaker.wave.2.fill")
-                    .foregroundStyle(.red)
-                .font(.caption)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-    private func formatTime(_ time: Float) -> String {
-        let minutes = Int(time) / 60
-        let seconds = Int(time) % 60
-        return String(format: "%d:%02d", minutes, seconds)
-    }
-}
-
-struct DocumentPicker: UIViewControllerRepresentable{
-    let audioManager: AudioManager
-    @Environment(\.dismiss) var dismiss
-
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController{
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audio])
-        picker.allowsMultipleSelection = true
-        picker.delegate = context.coordinator
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let parent: DocumentPicker
-
-        init(_ parent: DocumentPicker){
-            self.parent = parent
-        }
-
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]){
-            for url in urls {
-                parent.audioManager.importAudioFile(from: url)
-            }
-            parent.dismiss()
-        }
-
-        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController){
-            parent.dismiss()
-        }
-
-    }
-}
-
+// MARK: - MiniPlayerBar Implementation
 struct MiniPlayerBar: View {
     @ObservedObject var audioManager: AudioManager
     @Binding var navigateToPlayer: Bool
@@ -690,9 +449,8 @@ struct MiniPlayerBar: View {
             .padding(.horizontal, 4)
         }
     }
-
-
-
+    
+    
     private var progressPercentage: CGFloat {
         guard audioManager.duration > 0 else { return 0 }
         return CGFloat(audioManager.currentTime / audioManager.duration)
@@ -707,3 +465,223 @@ struct MiniPlayerBar: View {
 }
 
 
+// MARK: - Subviews & Helpers (Restored exact logic)
+struct PlaylistRowView: View {
+    let playlist: Playlist
+    @ObservedObject var audioManager: AudioManager
+    var playlistSongs: [AudioFile] { audioManager.getAudioFiles(for: playlist) }
+    var body: some View {
+        HStack {
+            if let artworkName = playlist.artworkImageName, let image = audioManager.loadArtworkImage(artworkName) {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill).frame(width: 50, height: 50).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                Image(systemName: "music.note.list").font(.title2).foregroundStyle(.red).frame(width: 30)
+            }
+            VStack(alignment: .leading) {
+                Text(playlist.name).font(.headline).foregroundStyle(.white)
+                Text("\(playlistSongs.count) songs").font(.caption).foregroundStyle(.gray)
+            }
+            Spacer()
+        }.padding(.vertical, 8)
+    }
+}
+
+struct EmptyStateView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "moon.zzz.fill").font(.system(size: 60)).foregroundStyle(.red.opacity(0.8))
+            Text("No audio Files .·°՞(¯□¯)՞°·.").font(.title2).fontWeight(.semibold).foregroundStyle(.red.opacity(0.8))
+            Text("press the + to add files").foregroundStyle(.red.opacity(0.8))
+        }.frame(maxHeight: .infinity)
+    }
+}
+
+struct AudioFileButton: View {
+    let audioFile: AudioFile
+    @ObservedObject var audioManager: AudioManager
+    @Binding var navigateToPlayer: Bool
+    @Binding var selectedAudioFile: AudioFile?
+    @Binding var showingRenameAlert: Bool
+    @Binding var renamingAudioFile: AudioFile?
+    @Binding var newFileName: String
+    var context: [AudioFile]? = nil
+    var isFromSongsTab: Bool = false
+    var isReorderMode: Bool = false
+    @Binding var showingShareSheet: Bool
+    @Binding var shareURL: URL?
+    @Binding var showingAudioArtworkPicker: Bool
+    @Binding var artworkAudioFile: AudioFile?
+
+    var body: some View {
+        Button {
+            if !isReorderMode {
+                let isSameSong = audioManager.currentlyPlayingID == audioFile.id
+                let isSameContext = audioManager.playingFromSongsTab == isFromSongsTab
+                if isSameSong && isSameContext {
+                    selectedAudioFile = audioFile
+                    navigateToPlayer = true
+                } else {
+                    audioManager.play(audioFile: audioFile, context: context, fromSongsTab: isFromSongsTab)
+                }
+            }
+        } label: {
+            AudioFileRow(audioFile: audioFile, isCurrentlyPlaying: audioManager.currentlyPlayingID == audioFile.id && audioManager.playingFromSongsTab == isFromSongsTab, audioManager: audioManager)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .contextMenu {
+            if !isReorderMode {
+                AudioFileContextMenu(audioFile: audioFile, audioManager: audioManager, showingRenameAlert: $showingRenameAlert, renamingAudioFile: $renamingAudioFile, newFileName: $newFileName, showingShareSheet: $showingShareSheet, shareURL: $shareURL, showingAudioArtworkPicker: $showingAudioArtworkPicker, artworkAudioFile: $artworkAudioFile)
+            }
+        }
+    }
+}
+
+struct AudioFileRow: View {
+    let audioFile: AudioFile
+    let isCurrentlyPlaying: Bool
+    @ObservedObject var audioManager: AudioManager
+    var body: some View {
+        HStack {
+            if let artworkName = audioFile.artworkImageName, let image = audioManager.loadArtworkImage(artworkName) {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill).frame(width: 50, height: 50).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(isCurrentlyPlaying ? Color.red : Color.clear, lineWidth: 2))
+            } else {
+                Image(systemName: isCurrentlyPlaying ? "face.smiling.fill" : "face.smiling").foregroundStyle(isCurrentlyPlaying ? .red : .gray).font(.title2).frame(width: 50, height: 50)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(audioFile.fileName).font(.headline).foregroundStyle(isCurrentlyPlaying ? .red : .primary)
+                HStack {
+                    Text(audioFile.dateAdded, style: .date)
+                    Text(formatTime(audioFile.audioDuration))
+                }.font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isCurrentlyPlaying { Image(systemName: "speaker.wave.2.fill").foregroundStyle(.red).font(.caption) }
+        }.padding(.vertical, 4)
+    }
+    private func formatTime(_ time: Float) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: activityItems, applicationActivities: nil) }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+struct AudioFileContextMenu: View {
+    let audioFile: AudioFile
+    @ObservedObject var audioManager: AudioManager
+    @Binding var showingRenameAlert: Bool
+    @Binding var renamingAudioFile: AudioFile?
+    @Binding var newFileName: String
+    @Binding var showingShareSheet: Bool
+    @Binding var shareURL: URL?
+    @Binding var showingAudioArtworkPicker: Bool
+    @Binding var artworkAudioFile: AudioFile?
+    var body: some View {
+        Button("share this file", systemImage: "square.and.arrow.up") {
+            shareURL = audioManager.urlForSharing(audioFile)
+            showingShareSheet = true
+        }
+        Button(audioFile.artworkImageName == nil ? "Set Artwork" : "Change Artwork", systemImage: "photo") {
+            artworkAudioFile = audioFile
+            showingAudioArtworkPicker = true
+        }
+        if audioFile.artworkImageName != nil {
+            Button("Remove Artwork", systemImage: "photo.badge.minus", role: .destructive) { audioManager.removeArtwork(from: audioFile) }
+        }
+        Button("rename", systemImage: "pencil.and.outline") {
+            renamingAudioFile = audioFile
+            newFileName = audioFile.fileName
+            showingRenameAlert = true
+        }
+        Menu {
+            ForEach(audioManager.playlists) { playlist in
+                Button(playlist.name) { audioManager.addAudioFile(audioFile, to: playlist) }
+            }
+        } label: { Label("Add to Playlist", systemImage: "plus") }
+        Button(role: .destructive) { audioManager.deleteAudioFile(audioFile) } label: { Label("Delete via Menu", systemImage: "trash") }
+    }
+}
+
+struct DocumentPicker: UIViewControllerRepresentable {
+    let audioManager: AudioManager
+    @Environment(\.dismiss) var dismiss
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audio])
+        picker.allowsMultipleSelection = true
+        picker.delegate = context.coordinator
+        return picker
+    }
+    func updateUIViewController(_ ui: UIDocumentPickerViewController, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let parent: DocumentPicker
+        init(_ parent: DocumentPicker) { self.parent = parent }
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            for url in urls { parent.audioManager.importAudioFile(from: url) }
+            parent.dismiss()
+        }
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { parent.dismiss() }
+    }
+}
+
+struct PhotoPicker: UIViewControllerRepresentable {
+    let audioManager: AudioManager
+    let audioFile: AudioFile
+    @Environment(\.dismiss) var dismiss
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var config = PHPickerConfiguration(photoLibrary: .shared())
+        config.filter = .images
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = context.coordinator
+        return picker
+    }
+    func updateUIViewController(_ ui: PHPickerViewController, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        let parent: PhotoPicker
+        init(_ parent: PhotoPicker) { self.parent = parent }
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            parent.dismiss()
+            guard let result = results.first else { return }
+            result.itemProvider.loadObject(ofClass: UIImage.self) { object, _ in
+                if let image = object as? UIImage {
+                    DispatchQueue.main.async { self.parent.audioManager.setArtwork(image, for: self.parent.audioFile) }
+                }
+            }
+        }
+    }
+}
+
+struct PlaylistPhotoPicker: UIViewControllerRepresentable {
+    let audioManager: AudioManager
+    let playlist: Playlist
+    @Environment(\.dismiss) var dismiss
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var config = PHPickerConfiguration()
+        config.filter = .images
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = context.coordinator
+        return picker
+    }
+    func updateUIViewController(_ ui: PHPickerViewController, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        let parent: PlaylistPhotoPicker
+        init(_ parent: PlaylistPhotoPicker) { self.parent = parent }
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            parent.dismiss()
+            guard let result = results.first else { return }
+            result.itemProvider.loadObject(ofClass: UIImage.self) { object, _ in
+                if let image = object as? UIImage {
+                    DispatchQueue.main.async { self.parent.audioManager.setArtwork(image, for: self.parent.playlist) }
+                }
+            }
+        }
+    }
+}
