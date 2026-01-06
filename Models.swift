@@ -69,14 +69,20 @@ enum LibraryItem: Identifiable {
     }
 }
 
+
 enum ArtworkTarget: Identifiable {
     case audioFile(AudioFile)
     case playlist(Playlist)
+    case multipleFiles(Set<UUID>)
     
-    var id: UUID {
+    var id: String {
         switch self {
-        case .audioFile(let file): return file.id
-        case .playlist(let playlist): return playlist.id
+        case .audioFile(let file):
+            return "file-\(file.id)"
+        case .playlist(let playlist):
+            return "playlist-\(playlist.id)"
+        case .multipleFiles(let ids):
+            return "multiple-\(ids.sorted().map { $0.uuidString }.joined())"
         }
     }
 }

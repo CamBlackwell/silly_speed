@@ -21,6 +21,12 @@ struct ContentView: View {
     @State private var shareURL: URL?
     @State private var artworkTarget: ArtworkTarget?
     
+    // Multi-select states
+    @State private var isMultiSelectMode = false
+    @State private var selectedFileIDs: Set<UUID> = []
+    @State private var showingBatchPlaylistMenu = false
+    @State private var showingBatchDeleteAlert = false
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
@@ -43,12 +49,14 @@ struct ContentView: View {
                             renamingPlaylist: $renamingPlaylist,
                             newPlaylistNameRename: $newPlaylistNameRename,
                             isReorderMode: $isReorderMode,
-                            artworkTarget: $artworkTarget
+                            artworkTarget: $artworkTarget,
+                            isMultiSelectMode: $isMultiSelectMode,
+                            selectedFileIDs: $selectedFileIDs
                         )
                     }
                 }
                 
-                if audioManager.currentlyPlayingID != nil {
+                if audioManager.currentlyPlayingID != nil && !isMultiSelectMode {
                     MiniPlayerBar(
                         audioManager: audioManager,
                         navigateToPlayer: $navigateToPlayer,
@@ -83,9 +91,36 @@ struct ContentView: View {
 
                         Spacer()
                         
-                        if isReorderMode {
+                        // "All" button when in multi-select mode
+                        if isMultiSelectMode {
                             Button {
-                                isReorderMode = false
+                                if selectedFileIDs.count == audioManager.displayedSongs.count {
+                                    selectedFileIDs.removeAll()
+                                } else {
+                                    selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
+                                }
+                            } label: {
+                                Text("All")
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 12)
+                                    .background(.ultraThinMaterial)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.trailing, 8)
+                            .padding(.top, 10)
+                        }
+                        
+                        if isReorderMode || isMultiSelectMode {
+                            Button {
+                                if isReorderMode {
+                                    isReorderMode = false
+                                } else {
+                                    isMultiSelectMode = false
+                                    selectedFileIDs.removeAll()
+                                }
                             } label: {
                                 Text("Done")
                                     .font(.headline)
@@ -106,6 +141,10 @@ struct ContentView: View {
                                     showingCreatePlaylistAlert = true
                                 } label: { Label("Create Playlist", systemImage: "text.badge.plus") }
                                 if libraryFilter == .songs {
+                                    Button {
+                                        isMultiSelectMode = true
+                                        selectedFileIDs.removeAll()
+                                    } label: { Label("Select Multiple", systemImage: "checkmark.circle") }
                                     Button { isReorderMode = true } label: { Label("Reorder Songs", systemImage: "arrow.up.arrow.down") }
                                 }
                             } label: {
@@ -134,8 +173,45 @@ struct ContentView: View {
                         audioManager.setArtwork(image, for: file)
                     case .playlist(let playlist):
                         audioManager.setArtwork(image, for: playlist)
+                    case .multipleFiles(let fileIDs):
+                        for fileID in fileIDs {
+                            if let file = audioManager.audioFiles.first(where: { $0.id == fileID }) {
+                                audioManager.setArtwork(image, for: file)
+                            }
+                        }
                     }
                 }
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                if let url = shareURL {
+                    ShareSheet(activityItems: [url])
+                }
+            }
+            .confirmationDialog("Add to Playlist", isPresented: $showingBatchPlaylistMenu) {
+                ForEach(audioManager.playlists) { playlist in
+                    Button(playlist.name) {
+                        for fileID in selectedFileIDs {
+                            if let file = audioManager.audioFiles.first(where: { $0.id == fileID }) {
+                                audioManager.addAudioFile(file, to: playlist)
+                            }
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            }
+            .alert("Delete Selected Files", isPresented: $showingBatchDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    for fileID in selectedFileIDs {
+                        if let file = audioManager.audioFiles.first(where: { $0.id == fileID }) {
+                            audioManager.deleteAudioFile(file)
+                        }
+                    }
+                    selectedFileIDs.removeAll()
+                    isMultiSelectMode = false
+                }
+            } message: {
+                Text("Are you sure you want to delete \(selectedFileIDs.count) file(s)? This action cannot be undone.")
             }
             .alert("New Playlist", isPresented: $showingCreatePlaylistAlert) {
                 TextField("Playlist Name", text: $newPlaylistName)
@@ -198,6 +274,8 @@ struct LibraryListView: View {
     @Binding var newPlaylistNameRename: String
     @Binding var isReorderMode: Bool
     @Binding var artworkTarget: ArtworkTarget?
+    @Binding var isMultiSelectMode: Bool
+    @Binding var selectedFileIDs: Set<UUID>
     
     var body: some View {
         switch filter {
@@ -210,7 +288,9 @@ struct LibraryListView: View {
                 renamingAudioFile: $renamingAudioFile,
                 newFileName: $newFileName,
                 isReorderMode: $isReorderMode,
-                artworkTarget: $artworkTarget
+                artworkTarget: $artworkTarget,
+                isMultiSelectMode: $isMultiSelectMode,
+                selectedFileIDs: $selectedFileIDs
             )
         case .playlists:
             PlaylistsListView(
@@ -238,9 +318,13 @@ struct SongsListView: View {
     @Binding var newFileName: String
     @Binding var isReorderMode: Bool
     @Binding var artworkTarget: ArtworkTarget?
+    @Binding var isMultiSelectMode: Bool
+    @Binding var selectedFileIDs: Set<UUID>
     @Environment(\.editMode) private var editMode
     @State private var showingShareSheet = false
-    @State private var shareURL: URL?
+    @State private var shareURLs: [URL] = []
+    @State private var showingBatchPlaylistMenu = false
+    @State private var showingBatchDeleteAlert = false
 
     var sortedSongs: [AudioFile] { audioManager.displayedSongs }
 
@@ -261,14 +345,34 @@ struct SongsListView: View {
                     isFromSongsTab: true,
                     isReorderMode: isReorderMode,
                     showingShareSheet: $showingShareSheet,
-                    shareURL: $shareURL,
-                    artworkTarget: $artworkTarget
+                    shareURLs: $shareURLs,
+                    artworkTarget: $artworkTarget,
+                    isMultiSelectMode: isMultiSelectMode,
+                    selectedFileIDs: $selectedFileIDs,
+                    showingBatchPlaylistMenu: $showingBatchPlaylistMenu,
+                    showingBatchDeleteAlert: $showingBatchDeleteAlert
                 )
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .listRowSeparator(.hidden)
             }
             .onMove { source, destination in
-                audioManager.reorderSongs(from: source, to: destination)
+                if isMultiSelectMode && !selectedFileIDs.isEmpty {
+                    // Move selected files as a contiguous block
+                    let selectedIndices = sortedSongs.enumerated()
+                        .filter { selectedFileIDs.contains($0.element.id) }
+                        .map { $0.offset }
+                    
+                    // Only proceed if the dragged items are the selected ones
+                    if source.allSatisfy({ selectedIndices.contains($0) }) {
+                        audioManager.reorderSelectedSongs(
+                            selectedIDs: Array(selectedFileIDs),
+                            to: destination,
+                            in: sortedSongs
+                        )
+                    }
+                } else {
+                    audioManager.reorderSongs(from: source, to: destination)
+                }
             }
             
             Color.clear.frame(height: 80).listRowBackground(Color.clear).listRowSeparator(.hidden)
@@ -276,9 +380,42 @@ struct SongsListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-        .environment(\.editMode, isReorderMode ? .constant(.active) : .constant(.inactive))
-        .sheet(isPresented: $showingShareSheet) {
-            if let url = shareURL { ShareSheet(activityItems: [url]) }
+        .environment(\.editMode, (isReorderMode || isMultiSelectMode) ? .constant(.active) : .constant(.inactive))
+        .sheet(isPresented: $showingShareSheet, onDismiss: {
+            for url in self.shareURLs {
+                try? FileManager.default.removeItem(at: url)
+            }
+            self.shareURLs.removeAll()
+        } as (() -> Void)) {
+            ShareSheet(activityItems: shareURLs)
+        }
+        .confirmationDialog("Add to Playlist", isPresented: $showingBatchPlaylistMenu) {
+            ForEach(audioManager.playlists) { playlist in
+                Button(playlist.name) {
+                    for fileID in selectedFileIDs {
+                        if let file = audioManager.audioFiles.first(where: { $0.id == fileID }) {
+                            audioManager.addAudioFile(file, to: playlist)
+                        }
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Add \(selectedFileIDs.count) song(s) to playlist")
+        }
+        .alert("Delete Selected Files", isPresented: $showingBatchDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                for fileID in selectedFileIDs {
+                    if let file = audioManager.audioFiles.first(where: { $0.id == fileID }) {
+                        audioManager.deleteAudioFile(file)
+                    }
+                }
+                selectedFileIDs.removeAll()
+                isMultiSelectMode = false
+            }
+        } message: {
+            Text("Are you sure you want to delete \(selectedFileIDs.count) file(s)? This action cannot be undone.")
         }
     }
 }
@@ -523,12 +660,22 @@ struct AudioFileButton: View {
     var isFromSongsTab: Bool = false
     var isReorderMode: Bool = false
     @Binding var showingShareSheet: Bool
-    @Binding var shareURL: URL?
+    @Binding var shareURLs: [URL]
     @Binding var artworkTarget: ArtworkTarget?
+    var isMultiSelectMode: Bool = false
+    @Binding var selectedFileIDs: Set<UUID>
+    @Binding var showingBatchPlaylistMenu: Bool
+    @Binding var showingBatchDeleteAlert: Bool
 
     var body: some View {
         Button {
-            if !isReorderMode {
+            if isMultiSelectMode {
+                if selectedFileIDs.contains(audioFile.id) {
+                    selectedFileIDs.remove(audioFile.id)
+                } else {
+                    selectedFileIDs.insert(audioFile.id)
+                }
+            } else if !isReorderMode {
                 let isSameSong = audioManager.currentlyPlayingID == audioFile.id
                 let isSameContext = audioManager.playingFromSongsTab == isFromSongsTab
                 if isSameSong && isSameContext {
@@ -539,14 +686,93 @@ struct AudioFileButton: View {
                 }
             }
         } label: {
-            AudioFileRow(audioFile: audioFile, isCurrentlyPlaying: audioManager.currentlyPlayingID == audioFile.id && audioManager.playingFromSongsTab == isFromSongsTab, audioManager: audioManager)
+            AudioFileRow(
+                audioFile: audioFile,
+                isCurrentlyPlaying: audioManager.currentlyPlayingID == audioFile.id && audioManager.playingFromSongsTab == isFromSongsTab,
+                audioManager: audioManager,
+                isMultiSelectMode: isMultiSelectMode,
+                isSelected: selectedFileIDs.contains(audioFile.id)
+            )
         }
         .buttonStyle(PlainButtonStyle())
         .contextMenu {
             if !isReorderMode {
-                AudioFileContextMenu(audioFile: audioFile, audioManager: audioManager, showingRenameAlert: $showingRenameAlert, renamingAudioFile: $renamingAudioFile, newFileName: $newFileName, showingShareSheet: $showingShareSheet, shareURL: $shareURL, artworkTarget: $artworkTarget)
+                if isMultiSelectMode && selectedFileIDs.contains(audioFile.id) {
+                    // Multi-select context menu
+                    MultiSelectContextMenu(
+                        audioManager: audioManager,
+                        selectedFileIDs: selectedFileIDs,
+                        showingShareSheet: $showingShareSheet,
+                        shareURLs: $shareURLs,
+                        artworkTarget: $artworkTarget,
+                        showingBatchPlaylistMenu: $showingBatchPlaylistMenu,
+                        showingBatchDeleteAlert: $showingBatchDeleteAlert
+                    )
+                } else {
+                    // Single file context menu
+                    AudioFileContextMenu(
+                        audioFile: audioFile,
+                        audioManager: audioManager,
+                        showingRenameAlert: $showingRenameAlert,
+                        renamingAudioFile: $renamingAudioFile,
+                        newFileName: $newFileName,
+                        showingShareSheet: $showingShareSheet,
+                        shareURLs: $shareURLs,
+                        artworkTarget: $artworkTarget
+                    )
+                }
             }
         }
+    }
+}
+
+struct MultiSelectContextMenu: View {
+    @ObservedObject var audioManager: AudioManager
+    let selectedFileIDs: Set<UUID>
+    @Binding var showingShareSheet: Bool
+    @Binding var shareURLs: [URL]
+    @Binding var artworkTarget: ArtworkTarget?
+    @Binding var showingBatchPlaylistMenu: Bool
+    @Binding var showingBatchDeleteAlert: Bool
+    
+    var body: some View {
+        Button("Share \(selectedFileIDs.count) Files", systemImage: "square.and.arrow.up") {
+            shareURLs = prepareFilesForSharing()
+            showingShareSheet = true
+        }
+        
+        Button("Set Artwork for \(selectedFileIDs.count) Files", systemImage: "photo") {
+            artworkTarget = .multipleFiles(selectedFileIDs)
+        }
+        
+        Button("Add \(selectedFileIDs.count) to Playlist", systemImage: "text.badge.plus") {
+            showingBatchPlaylistMenu = true
+        }
+        
+        Button("Delete \(selectedFileIDs.count) Files", systemImage: "trash", role: .destructive) {
+            showingBatchDeleteAlert = true
+        }
+    }
+    
+    private func prepareFilesForSharing() -> [URL] {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        var tempURLs: [URL] = []
+        
+        for fileID in selectedFileIDs {
+            guard let file = audioManager.audioFiles.first(where: { $0.id == fileID }) else { continue }
+            
+            let tempURL = tempDir.appendingPathComponent(file.fileURL.lastPathComponent)
+            do {
+                try FileManager.default.copyItem(at: file.fileURL, to: tempURL)
+                tempURLs.append(tempURL)
+            } catch {
+                print("Error copying file for sharing: \(error)")
+            }
+        }
+        
+        return tempURLs
     }
 }
 
@@ -554,8 +780,17 @@ struct AudioFileRow: View {
     let audioFile: AudioFile
     let isCurrentlyPlaying: Bool
     @ObservedObject var audioManager: AudioManager
+    var isMultiSelectMode: Bool = false
+    var isSelected: Bool = false
+    
     var body: some View {
         HStack {
+            if isMultiSelectMode {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? .red : .gray)
+                    .font(.title2)
+            }
+            
             if let artworkName = audioFile.artworkImageName, let image = audioManager.loadArtworkImage(artworkName) {
                 Image(uiImage: image).resizable().aspectRatio(contentMode: .fill).frame(width: 50, height: 50).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(isCurrentlyPlaying ? Color.red : Color.clear, lineWidth: 2))
@@ -570,7 +805,7 @@ struct AudioFileRow: View {
                 }.font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            if isCurrentlyPlaying { Image(systemName: "speaker.wave.2.fill").foregroundStyle(.red).font(.caption) }
+            if isCurrentlyPlaying && !isMultiSelectMode { Image(systemName: "speaker.wave.2.fill").foregroundStyle(.red).font(.caption) }
         }.padding(.vertical, 4)
     }
     private func formatTime(_ time: Float) -> String {
@@ -593,12 +828,14 @@ struct AudioFileContextMenu: View {
     @Binding var renamingAudioFile: AudioFile?
     @Binding var newFileName: String
     @Binding var showingShareSheet: Bool
-    @Binding var shareURL: URL?
+    @Binding var shareURLs: [URL]
     @Binding var artworkTarget: ArtworkTarget?
     var body: some View {
         Button("share this file", systemImage: "square.and.arrow.up") {
-            shareURL = audioManager.urlForSharing(audioFile)
-            showingShareSheet = true
+            if let url = audioManager.urlForSharing(audioFile) {
+                shareURLs = [url]
+                showingShareSheet = true
+            }
         }
         Button(audioFile.artworkImageName == nil ? "Set Artwork" : "Change Artwork", systemImage: "photo") {
             artworkTarget = .audioFile(audioFile)

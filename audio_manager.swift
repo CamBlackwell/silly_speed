@@ -38,7 +38,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var displayedSongs: [AudioFile] = []
     @Published var isImporting: Bool = false
     @Published var importError: String?
-
+    
     private var currentEngine: AudioEngineProtocol?
     private var timer: Timer?
     private let fileDirectory: URL
@@ -64,7 +64,7 @@ class AudioManager: NSObject, ObservableObject {
             audioFiles.first { $0.id == id }
         }
     }
-
+    
     override init() {
         self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         self.artworkDirectory = fileDirectory.appendingPathComponent("Artwork", isDirectory: true)
@@ -130,7 +130,7 @@ class AudioManager: NSObject, ObservableObject {
             visualisationMode = mode
         }
     }
-
+    
     func saveVisualisationMode() {
         UserDefaults.standard.set(visualisationMode.rawValue, forKey: visualisationModeKey)
     }
@@ -185,7 +185,7 @@ class AudioManager: NSObject, ObservableObject {
             }
         }
     }
-
+    
     func reorderSongs(from source: IndexSet, to destination: Int) {
         displayedSongs.move(fromOffsets: source, toOffset: destination)
         
@@ -200,7 +200,7 @@ class AudioManager: NSObject, ObservableObject {
             playbackQueue = displayedSongs
         }
     }
-
+    
     func reorderPlaylistSongs(in playlist: Playlist, from source: IndexSet, to destination: Int) {
         guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
         
@@ -218,7 +218,7 @@ class AudioManager: NSObject, ObservableObject {
     private func saveSelectedAlgorithm(){
         UserDefaults.standard.set(selectedAlgorithm.rawValue, forKey: algorithmKey)
     }
-
+    
     private func setupAudioSession(){
         do {
             let audioSession = AVAudioSession.sharedInstance()
@@ -283,7 +283,7 @@ class AudioManager: NSObject, ObservableObject {
                   let userInfo = notification.userInfo,
                   let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
                   let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
-
+            
             if type == .began {
                 self.isPlaying = false
                 self.stopTimer()
@@ -316,7 +316,7 @@ class AudioManager: NSObject, ObservableObject {
             guard let userInfo = notification.userInfo,
                   let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
                   let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
-
+            
             if reason == .oldDeviceUnavailable {
                 DispatchQueue.main.async {
                     self?.togglePlayPause()
@@ -399,7 +399,7 @@ class AudioManager: NSObject, ObservableObject {
             }
         }
     }
-
+    
     func importAudioFile(from url: URL) {
         isImporting = true
         importError = nil
@@ -498,8 +498,8 @@ class AudioManager: NSObject, ObservableObject {
         var counter = 2
         while true {
             let newName = fileExtension.isEmpty
-                ? "\(nameWithoutExtension) \(counter)"
-                : "\(nameWithoutExtension) \(counter).\(fileExtension)"
+            ? "\(nameWithoutExtension) \(counter)"
+            : "\(nameWithoutExtension) \(counter).\(fileExtension)"
             
             let newURL = fileDirectory.appendingPathComponent(newName)
             
@@ -549,7 +549,7 @@ class AudioManager: NSObject, ObservableObject {
             playbackQueue.removeAll { $0.id == audioFile.id }
         }
     }
-
+    
     private func saveAudioFiles(){
         do {
             let data = try JSONEncoder().encode(audioFiles)
@@ -558,10 +558,10 @@ class AudioManager: NSObject, ObservableObject {
             print("failed to save audio files \(error.localizedDescription)")
         }
     }
-
+    
     private func loadAudioFiles(){
         guard let data = UserDefaults.standard.data(forKey: audioFilesKey) else { return }
-
+        
         do {
             let loadedFiles = try JSONDecoder().decode([AudioFile].self, from: data)
             audioFiles = loadedFiles.filter{FileManager.default.fileExists(atPath: $0.fileURL.path())}
@@ -584,7 +584,7 @@ class AudioManager: NSObject, ObservableObject {
     func urlForSharing(_ audioFile: AudioFile) -> URL? {
         audioFile.fileURL
     }
-
+    
     func createPlaylist(name: String) {
         let newPlaylist = Playlist(name: name)
         playlists.append(newPlaylist)
@@ -665,8 +665,8 @@ class AudioManager: NSObject, ObservableObject {
         }
         return nil
     }
-
-
+    
+    
     func setArtwork(_ image: UIImage, for audioFile: AudioFile) {
         guard let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) else { return }
         
@@ -690,7 +690,7 @@ class AudioManager: NSObject, ObservableObject {
         
         deleteArtworkIfUnused(oldArtwork)
     }
-
+    
     func setArtwork(_ image: UIImage, for playlist: Playlist) {
         guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
         
@@ -703,7 +703,7 @@ class AudioManager: NSObject, ObservableObject {
         
         deleteArtworkIfUnused(oldArtwork)
     }
-
+    
     func removeArtwork(from audioFile: AudioFile) {
         guard let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) else { return }
         
@@ -724,7 +724,7 @@ class AudioManager: NSObject, ObservableObject {
         
         deleteArtworkIfUnused(oldArtwork)
     }
-
+    
     func removeArtwork(from playlist: Playlist) {
         guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
         
@@ -735,7 +735,7 @@ class AudioManager: NSObject, ObservableObject {
         
         deleteArtworkIfUnused(oldArtwork)
     }
-
+    
     private func deleteArtworkIfUnused(_ imageName: String?) {
         guard let imageName = imageName else { return }
         
@@ -747,7 +747,7 @@ class AudioManager: NSObject, ObservableObject {
             try? FileManager.default.removeItem(at: fileURL)
         }
     }
-
+    
     func play(audioFile: AudioFile, context: [AudioFile]? = nil, fromSongsTab: Bool = false) {
         let isSameSong = currentlyPlayingID == audioFile.id
         
@@ -772,29 +772,29 @@ class AudioManager: NSObject, ObservableObject {
             print("Could not activate session: \(error)")
             return
         }
-
+        
         guard let engine = currentEngine else { return }
         
         stopTimer()
         self.currentTime = 0
-
+        
         if currentlyPlayingID != audioFile.id {
             engine.stop()
         }
-
+        
         engine.load(audioFile: audioFile)
         engine.setTempo(tempo)
         engine.setPitch(pitch)
         
         engine.play()
-
+        
         isPlaying = true
         self.currentlyPlayingID = audioFile.id
         self.duration = TimeInterval(audioFile.audioDuration)
         startTimer()
         updateNowPlayingInfo()
     }
-
+    
     func stop() {
         currentEngine?.stop()
         isPlaying = false
@@ -808,10 +808,10 @@ class AudioManager: NSObject, ObservableObject {
             print("Deactivation failed: \(error)")
         }
     }
-
+    
     func togglePlayPause() {
         guard let engine = currentEngine else {return}
-
+        
         if engine.isPlaying {
             engine.pause()
             isPlaying = false
@@ -835,17 +835,17 @@ class AudioManager: NSObject, ObservableObject {
             playbackQueue = reorderedSongs
         }
     }
-
+    
     func seek(to time: TimeInterval){
         isSeeking = true
         currentEngine?.seek(to: time)
         currentTime = time
-
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.isSeeking = false
         }
     }
-
+    
     func setVolume(_ volume: Float){
         currentEngine?.setVolume(volume)
     }
@@ -859,7 +859,7 @@ class AudioManager: NSObject, ObservableObject {
         pitch = max(-2400, min(2400, newPitch))
         currentEngine?.setPitch(pitch)
     }
-
+    
     private func startTimer(){
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self = self, let engine = self.currentEngine else { return }
@@ -878,7 +878,7 @@ class AudioManager: NSObject, ObservableObject {
             }
         }
     }
-
+    
     private func stopTimer(){
         timer?.invalidate()
         timer = nil
@@ -943,8 +943,50 @@ class AudioManager: NSObject, ObservableObject {
             }
         }
     }
+    
+    func reorderSelectedSongs(selectedIDs: [UUID], to destination: Int, in currentSongs: [AudioFile], playlist: Playlist? = nil) {
+        let selectedIndices = currentSongs.enumerated()
+            .filter { selectedIDs.contains($0.element.id) }
+            .map { $0.offset }
+            .sorted()
+        
+        let selectedSongs = selectedIndices.map { currentSongs[$0] }
+        var songs = currentSongs
+        
+        for index in selectedIndices.reversed() {
+            songs.remove(at: index)
+        }
+        
+        let adjustedDestination = destination - selectedIndices.filter { $0 < destination }.count
+        
+        songs.insert(contentsOf: selectedSongs, at: adjustedDestination)
+        
+        if let playlist = playlist {
+            guard let playlistIndex = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
+            
+            let reorderedIDs = songs.map { $0.id }
+            playlists[playlistIndex].audioFileIDs = reorderedIDs
+            savePlaylists()
+            
+            if !playingFromSongsTab {
+                playbackQueue = songs
+            }
+        } else {
+            displayedSongs = songs
+            
+            guard let masterID = masterPlaylistID,
+                  let index = playlists.firstIndex(where: { $0.id == masterID }) else { return }
+            
+            let reorderedIDs = songs.map { $0.id }
+            playlists[index].audioFileIDs = reorderedIDs
+            savePlaylists()
+            
+            if playingFromSongsTab {
+                playbackQueue = displayedSongs
+            }
+        }
+    }
 }
-
 
 extension AudioManager: AVAudioPlayerDelegate{
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool){
