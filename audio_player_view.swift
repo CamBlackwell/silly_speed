@@ -20,7 +20,7 @@ struct AudioPlayerView: View {
                     .fontDesign(.serif)
                     .fontWeight(.heavy)
                     .multilineTextAlignment(.center)
-                    .lineLimit(2)
+                    .lineLimit(1)
 
                 HStack {
                     algorithmSelector

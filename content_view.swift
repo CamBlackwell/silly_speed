@@ -24,6 +24,17 @@ struct ContentView: View {
     @State private var selectedFileIDs: Set<UUID> = []
     @State private var showingBatchPlaylistMenu = false
     @State private var showingBatchDeleteAlert = false
+    @State private var showingSongView = true
+    
+    var shouldShowEmptyPlaylistView: Bool {
+        audioManager.playlists.count == 1 && !showingSongView //check if 1 since master will always take 1 spot
+    }
+    
+    var shouldShowEmptySongsView: Bool {
+        audioManager.audioFiles.isEmpty && showingSongView
+    }
+    
+
     
     var body: some View {
         NavigationStack {
@@ -32,8 +43,10 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    if audioManager.audioFiles.isEmpty && audioManager.playlists.isEmpty {
-                        EmptyStateView()
+                    if shouldShowEmptySongsView{
+                        EmptySongStateView()
+                    } else if shouldShowEmptyPlaylistView{
+                        EmptyPlaylistView()
                     } else {
                         LibraryListView(
                             audioManager: audioManager,
@@ -68,6 +81,7 @@ struct ContentView: View {
                     HStack {
                         Button(action: {
                             libraryFilter = libraryFilter == .songs ? .playlists : .songs
+                            showingSongView = !showingSongView
                         }) {
                             HStack(spacing: 8) {
                                 Image(systemName: libraryFilter == .songs ? "music.note" : "music.note.list")
@@ -185,7 +199,8 @@ struct ContentView: View {
                 }
             }
             .confirmationDialog("Add to Playlist", isPresented: $showingBatchPlaylistMenu) {
-                ForEach(audioManager.playlists) { playlist in
+                let playlists = audioManager.sortedPlaylists
+                ForEach(playlists) { playlist in
                     Button(playlist.name) {
                         for fileID in selectedFileIDs {
                             if let file = audioManager.audioFiles.first(where: { $0.id == fileID }) {
@@ -387,7 +402,8 @@ struct SongsListView: View {
             ShareSheet(activityItems: shareURLs)
         }
         .confirmationDialog("Add to Playlist", isPresented: $showingBatchPlaylistMenu) {
-            ForEach(audioManager.playlists) { playlist in
+            let playlists = audioManager.sortedPlaylists
+            ForEach(playlists) { playlist in
                 Button(playlist.name) {
                     for fileID in selectedFileIDs {
                         if let file = audioManager.audioFiles.first(where: { $0.id == fileID }) {
@@ -429,13 +445,13 @@ struct PlaylistsListView: View {
     @Binding var newPlaylistNameRename: String
     @Binding var artworkTarget: ArtworkTarget?
     
-    var sortedPlaylists: [Playlist] { audioManager.playlists.sorted { $0.dateAdded > $1.dateAdded } }
+
     
     var body: some View {
         List {
             Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
             
-            ForEach(sortedPlaylists) { playlist in
+            ForEach(audioManager.sortedPlaylists) { playlist in
                 NavigationLink(destination: PlaylistDetailView(
                     playlist: playlist,
                     audioManager: audioManager,
@@ -635,12 +651,21 @@ struct PlaylistRowView: View {
     }
 }
 
-struct EmptyStateView: View {
+struct EmptySongStateView: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "moon.zzz.fill").font(.system(size: 60)).foregroundStyle(.red.opacity(0.8))
             Text("No audio Files .·°ღ(¯`□´¯)ღ°·.").font(.title2).fontWeight(.semibold).foregroundStyle(.red.opacity(0.8))
             Text("press the + to add files").foregroundStyle(.red.opacity(0.8))
+        }.frame(maxHeight: .infinity)
+    }
+}
+struct EmptyPlaylistView: View{
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "moon.zzz.fill").font(.system(size: 60)).foregroundStyle(.red.opacity(0.8))
+            Text("No playlists   ༼ ༎ຶ ෴ ༎ຶ༽").font(.title2).fontWeight(.semibold).foregroundStyle(.red.opacity(0.8))
+            Text("press the + to add playlists").foregroundStyle(.red.opacity(0.8))
         }.frame(maxHeight: .infinity)
     }
 }
@@ -860,7 +885,7 @@ struct AudioFileContextMenu: View {
             showingRenameAlert = true
         }
         Menu {
-            ForEach(audioManager.playlists) { playlist in
+            ForEach(audioManager.sortedPlaylists) { playlist in
                 Button(playlist.name) { audioManager.addAudioFile(audioFile, to: playlist) }
             }
         } label: { Label("Add to Playlist", systemImage: "plus") }

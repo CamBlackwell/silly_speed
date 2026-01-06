@@ -49,7 +49,7 @@ class AudioManager: NSObject, ObservableObject {
     private let visualisationModeKey = "visualisationMode"
     private var isSeeking = false
     private let masterPlaylistKey = "masterPlaylistID"
-    private var masterPlaylistID: UUID?
+    private(set) var masterPlaylistID: UUID?
     
     private var playbackQueue: [AudioFile] = []
     private var observerTokens: [Any] = []
@@ -65,6 +65,12 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     
+    var sortedPlaylists: [Playlist] {
+        playlists
+            .filter { $0.id != masterPlaylistID }
+            .sorted { $0.dateAdded > $1.dateAdded }
+    }
+    
     override init() {
         self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         self.artworkDirectory = fileDirectory.appendingPathComponent("Artwork", isDirectory: true)
@@ -72,8 +78,8 @@ class AudioManager: NSObject, ObservableObject {
         try? FileManager.default.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
         loadAudioFiles()
         cleanupOrphanedFiles()
-        loadPlaylists()
         loadOrCreateMasterPlaylist()
+        loadPlaylists()
         self.displayedSongs = self.sortedAudioFiles
         loadSelectedAlgorithm()
         loadVisualisationMode()
@@ -163,12 +169,19 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     
+    private func clearZombiePlaylists() {
+        playlists = []
+        savePlaylists()
+        UserDefaults.standard.removeObject(forKey: masterPlaylistKey)
+    }
+    
     private func loadOrCreateMasterPlaylist() {
         if let data = UserDefaults.standard.data(forKey: masterPlaylistKey),
            let id = try? JSONDecoder().decode(UUID.self, from: data),
            playlists.contains(where: { $0.id == id }) {
             masterPlaylistID = id
         } else {
+            clearZombiePlaylists()
             let masterPlaylist = Playlist(name: "__MASTER_SONGS__")
             masterPlaylistID = masterPlaylist.id
             playlists.append(masterPlaylist)
@@ -986,6 +999,7 @@ class AudioManager: NSObject, ObservableObject {
             }
         }
     }
+    
 }
 
 extension AudioManager: AVAudioPlayerDelegate{
