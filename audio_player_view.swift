@@ -4,6 +4,7 @@ import Combine
 struct AudioPlayerView: View {
     let audioFile: AudioFile
     @ObservedObject var audioManager: AudioManager
+    @EnvironmentObject var theme: ThemeManager
     @State private var volume: Float = 1.0
     @State private var isScrubbing: Bool = false
     @State private var sliderValue: Double = 0
@@ -11,16 +12,18 @@ struct AudioPlayerView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.15, green: 0.15, blue: 0.15)
+            Color(theme.backgroundColor)
                 .ignoresSafeArea()
+            
+            
 
             VStack(spacing: 8) {
-                Text(activeFile?.title ?? audioFile.title)
+                /*Text(activeFile?.title ?? audioFile.title)
                     .font(.title2)
                     .fontDesign(.serif)
                     .fontWeight(.heavy)
                     .multilineTextAlignment(.center)
-                    .lineLimit(1)
+                    .lineLimit(1) */
 
                 HStack {
                     algorithmSelector
@@ -38,6 +41,7 @@ struct AudioPlayerView: View {
             }
             .padding()
         }
+        .navigationTitle(activeFile?.title ?? audioFile.title)
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
         .onChange(of: audioManager.currentlyPlayingID) { oldID, newID in
@@ -69,10 +73,10 @@ struct AudioPlayerView: View {
             HStack {
                 Image(systemName: audioManager.visualisationMode.icon)
                     .font(.subheadline)
-                    .tint(.white)
+                    .tint(theme.textColor)
                 Image(systemName: "chevron.down")
                     .font(.caption)
-                    .tint(.white)
+                    .tint(theme.textColor)
             }
             .padding()
         }
@@ -116,9 +120,9 @@ struct AudioPlayerView: View {
                 VStack(spacing: 20) {
                     Image(systemName: "photo")
                         .font(.system(size: 60))
-                        .foregroundStyle(.gray.opacity(0.5))
+                        .foregroundStyle(theme.secondaryTextColor.opacity(0.5))
                     Text("No artwork")
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(theme.secondaryTextColor)
                 }
                 .frame(maxHeight: .infinity)
                 .transition(.scale.combined(with: .opacity))
@@ -161,10 +165,10 @@ struct AudioPlayerView: View {
             HStack {
                 Text("\(audioManager.selectedAlgorithm.rawValue)")
                     .font(.subheadline)
-                    .tint(.white)
+                    .tint(theme.textColor)
                 Image(systemName: "chevron.down")
                     .font(.caption)
-                    .tint(.white)
+                    .tint(theme.textColor)
             }
             .padding()
         }
@@ -182,7 +186,7 @@ struct AudioPlayerView: View {
                     }
                 }
             )
-            .tint(.red)
+            .tint(theme.accentColor)
             .disabled(audioManager.currentlyPlayingID == nil)
             .onChange(of: audioManager.currentTime) { oldTime, newTime in
                 if !isDragging {
@@ -194,11 +198,11 @@ struct AudioPlayerView: View {
             HStack {
                 Text(formatTime(isDragging ? sliderValue : audioManager.currentTime))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
                 Spacer()
                 Text(formatTime(audioManager.duration))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
             }
         }
         .padding(.horizontal)
@@ -210,7 +214,7 @@ struct AudioPlayerView: View {
                 Button(action: { audioManager.skipPreviousSong()}) {
                     Image(systemName: "backward.fill")
                         .font(.title)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.accentColor)
                 }
                 .buttonStyle(PlainButtonStyle())
 
@@ -223,12 +227,12 @@ struct AudioPlayerView: View {
                 }) {
                     ZStack {
                         Circle()
-                            .fill(Color.red)
+                            .fill(theme.accentColor)
                             .frame(width: 70, height: 70)
 
                         Image(systemName: isThisFilePlaying ? "pause.fill" : "play.fill")
                             .font(.title)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(theme.textColor)
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -236,7 +240,7 @@ struct AudioPlayerView: View {
                 Button(action: { audioManager.skipNextSong() }) {
                     Image(systemName: "forward.fill")
                         .font(.title)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.accentColor)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .disabled(audioManager.audioFiles.count < 2)
@@ -249,7 +253,7 @@ struct AudioPlayerView: View {
                 }) {
                     Image(systemName: audioManager.isLooping ? "repeat.1" : "repeat")
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(audioManager.isLooping ? .red : .secondary)
+                        .foregroundStyle(audioManager.isLooping ? theme.accentColor : theme.secondaryTextColor)
                         .padding(10)
                         .clipShape(Circle())
                 }
@@ -263,11 +267,12 @@ struct AudioPlayerView: View {
             HStack {
                 Text("Speed")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
                 Spacer()
                 Text("\(audioManager.tempo, specifier: "%.2f")x")
                     .font(.subheadline)
                     .fontWeight(.semibold)
+                    .foregroundStyle(theme.textColor)
                 Spacer()
                 resetTempoButton
             }
@@ -276,20 +281,20 @@ struct AudioPlayerView: View {
                 get: { audioManager.tempo },
                 set: { audioManager.setTempo($0) }
             ), in: 0.1...1.9)
-            .tint(.red)
+            .tint(theme.accentColor)
 
             HStack {
                 Text("0.1x")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
                 Spacer()
                 Text("1.0x")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
                 Spacer()
                 Text("2.0x")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
             }
         }
         .padding(.horizontal)
@@ -300,11 +305,12 @@ struct AudioPlayerView: View {
             HStack {
                 Text("Pitch")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
                 Spacer()
-                Text("\(audioManager.pitch / 100, specifier: "%.1f") semitones")
+                Text("\(audioManager.pitch / 100, specifier: "%.2f") semitones")
                     .font(.subheadline)
                     .fontWeight(.semibold)
+                    .foregroundStyle(theme.textColor)
                 Spacer()
                 resetPitchButton
             }
@@ -313,20 +319,20 @@ struct AudioPlayerView: View {
                 get: { audioManager.pitch },
                 set: { audioManager.setPitch($0) }
             ), in: -2400...2400)
-            .tint(.red)
+            .tint(theme.accentColor)
 
             HStack {
                 Text("-2 oct")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
                 Spacer()
                 Text("Normal")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
                 Spacer()
                 Text("+2 oct")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryTextColor)
             }
         }
         .padding(.horizontal)
@@ -338,7 +344,7 @@ struct AudioPlayerView: View {
         }) {
             Image(systemName: "arrow.counterclockwise")
                 .font(.subheadline)
-                .foregroundStyle(.red)
+                .foregroundStyle(theme.accentColor)
         }
         .padding(.horizontal)
     }
@@ -349,7 +355,7 @@ struct AudioPlayerView: View {
         }) {
             Image(systemName: "arrow.counterclockwise")
                 .font(.subheadline)
-                .foregroundStyle(.red)
+                .foregroundStyle(theme.accentColor)
         }
         .padding(.horizontal)
     }

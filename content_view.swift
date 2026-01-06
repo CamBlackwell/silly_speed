@@ -4,6 +4,7 @@ import PhotosUI
 
 struct ContentView: View {
     @StateObject private var audioManager = AudioManager()
+    @EnvironmentObject var theme: ThemeManager
     @State private var showingFilePicker = false
     @State private var navigateToPlayer = false
     @State private var selectedAudioFile: AudioFile?
@@ -39,7 +40,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                Color(red: 0.15, green: 0.15, blue: 0.15)
+                Color(theme.backgroundColor)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -86,11 +87,11 @@ struct ContentView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: libraryFilter == .songs ? "music.note" : "music.note.list")
                                     .font(.title2)
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(theme.accentColor)
                                 Text(libraryFilter.rawValue)
                                     .font(.title2)
                                     .fontWeight(.bold)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(theme.textColor)
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
@@ -113,7 +114,7 @@ struct ContentView: View {
                             } label: {
                                 Text("All")
                                     .font(.headline)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(theme.textColor)
                                     .padding(.horizontal, 24)
                                     .padding(.vertical, 12)
                                     .background(.ultraThinMaterial)
@@ -135,7 +136,7 @@ struct ContentView: View {
                             } label: {
                                 Text("Done")
                                     .font(.headline)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(theme.textColor)
                                     .padding(.horizontal, 24)
                                     .padding(.vertical, 12)
                                     .background(.red)
@@ -166,7 +167,7 @@ struct ContentView: View {
                                         .frame(width: 60, height: 60)
                                     Image(systemName: "plus")
                                         .font(.system(size: 24, weight: .semibold))
-                                        .foregroundStyle(.red)
+                                        .foregroundStyle(theme.accentColor)
                                 }
                             }
                             .padding(.trailing, 20)
@@ -269,7 +270,7 @@ struct ContentView: View {
             }
         }
         .navigationBarHidden(true)
-        .tint(.red)
+        .tint(theme.accentColor)
     }
 }
 
@@ -323,6 +324,7 @@ struct LibraryListView: View {
 
 struct SongsListView: View {
     @ObservedObject var audioManager: AudioManager
+    @EnvironmentObject var theme: ThemeManager
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
     @Binding var showingRenameAlert: Bool
@@ -364,7 +366,7 @@ struct SongsListView: View {
                     showingBatchPlaylistMenu: $showingBatchPlaylistMenu,
                     showingBatchDeleteAlert: $showingBatchDeleteAlert
                 )
-                .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
+                .listRowBackground(Color(theme.backgroundColor))
                 .listRowSeparator(.hidden)
                 
 
@@ -391,7 +393,7 @@ struct SongsListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .background(Color(theme.backgroundColor))
         .environment(\.editMode, (isReorderMode || isMultiSelectMode) ? .constant(.active) : .constant(.inactive))
         .sheet(isPresented: $showingShareSheet, onDismiss: {
             for url in self.shareURLs {
@@ -435,6 +437,7 @@ struct SongsListView: View {
 
 struct PlaylistsListView: View {
     @ObservedObject var audioManager: AudioManager
+    @EnvironmentObject var theme: ThemeManager
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
     @Binding var showingRenameAlert: Bool
@@ -464,7 +467,7 @@ struct PlaylistsListView: View {
                 )) {
                     PlaylistRowView(playlist: playlist, audioManager: audioManager)
                 }
-                .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
+                .listRowBackground(Color(theme.backgroundColor))
                 .listRowSeparator(.hidden)
                 .contextMenu {
                     Button(playlist.artworkImageName == nil ? "Set Artwork" : "Change Artwork", systemImage: "photo") {
@@ -494,6 +497,7 @@ struct PlaylistsListView: View {
 
 struct MiniPlayerBar: View {
     @ObservedObject var audioManager: AudioManager
+    @EnvironmentObject var theme: ThemeManager
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
     
@@ -515,26 +519,26 @@ struct MiniPlayerBar: View {
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .lineLimit(1)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(theme.textColor)
 
                             HStack {
                                 Text(formatTime(Float(audioManager.currentTime)))
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(theme.secondaryTextColor)
                                 Spacer()
                                 Text(formatTime(audioFile.audioDuration))
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(theme.secondaryTextColor)
                             }
 
                             GeometryReader { geometry in
                                 ZStack(alignment: .leading) {
                                     Rectangle()
-                                        .fill(Color.gray.opacity(0.3))
+                                        .fill(theme.backgroundColor.opacity(0.3))
                                         .frame(height: 3)
 
                                     Rectangle()
-                                        .fill(Color.red)
+                                        .fill(theme.accentColor)
                                         .frame(
                                             width: geometry.size.width * progressPercentage,
                                             height: 3
@@ -555,7 +559,7 @@ struct MiniPlayerBar: View {
                         Button(action: { audioManager.skipPreviousSong() }) {
                             Image(systemName: "backward.fill")
                                 .font(.title)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(theme.secondaryTextColor)
                         }
                         .buttonStyle(.plain)
 
@@ -564,14 +568,14 @@ struct MiniPlayerBar: View {
                         } label: {
                             Image(systemName: audioManager.isPlaying ? "pause.fill" : "play.fill")
                                 .font(.title2)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(theme.accentColor)
                         }
                         .buttonStyle(.plain)
 
                         Button(action: { audioManager.skipNextSong() }) {
                             Image(systemName: "forward.fill")
                                 .font(.title)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(theme.secondaryTextColor)
                         }
                         .buttonStyle(.plain)
                     }
@@ -604,6 +608,7 @@ struct MiniPlayerBar: View {
 struct PlaylistRowView: View {
     let playlist: Playlist
     @ObservedObject var audioManager: AudioManager
+    @EnvironmentObject var theme: ThemeManager
 
     var artworkImage: UIImage? {
         guard
@@ -632,14 +637,14 @@ struct PlaylistRowView: View {
             } else {
                 Image(systemName: "music.note.list")
                     .font(.title2)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(theme.accentColor)
                     .frame(width: 30)
             }
 
             VStack(alignment: .leading) {
                 Text(playlist.name)
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.textColor)
 
                 Text("\(playlistSongs.count) songs")
                     .font(.caption)
@@ -652,20 +657,22 @@ struct PlaylistRowView: View {
 }
 
 struct EmptySongStateView: View {
+    @EnvironmentObject var theme: ThemeManager
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "moon.zzz.fill").font(.system(size: 60)).foregroundStyle(.red.opacity(0.8))
-            Text("No audio Files .·°ღ(¯`□´¯)ღ°·.").font(.title2).fontWeight(.semibold).foregroundStyle(.red.opacity(0.8))
-            Text("press the + to add files").foregroundStyle(.red.opacity(0.8))
+            Image(systemName: "moon.zzz.fill").font(.system(size: 60)).foregroundStyle(theme.accentColor.opacity(0.8))
+            Text("No audio Files .·°ღ(¯`□´¯)ღ°·.").font(.title2).fontWeight(.semibold).foregroundStyle(theme.accentColor.opacity(0.8))
+            Text("press the + to add files").foregroundStyle(theme.accentColor.opacity(0.8))
         }.frame(maxHeight: .infinity)
     }
 }
 struct EmptyPlaylistView: View{
+    @EnvironmentObject var theme: ThemeManager
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "moon.zzz.fill").font(.system(size: 60)).foregroundStyle(.red.opacity(0.8))
-            Text("No playlists   ༼ ༎ຶ ෴ ༎ຶ༽").font(.title2).fontWeight(.semibold).foregroundStyle(.red.opacity(0.8))
-            Text("press the + to add playlists").foregroundStyle(.red.opacity(0.8))
+            Image(systemName: "moon.zzz.fill").font(.system(size: 60)).foregroundStyle(theme.accentColor.opacity(0.8))
+            Text("No playlists   ༼ ༎ຶ ෴ ༎ຶ༽").font(.title2).fontWeight(.semibold).foregroundStyle(theme.accentColor.opacity(0.8))
+            Text("press the + to add playlists").foregroundStyle(theme.accentColor.opacity(0.8))
         }.frame(maxHeight: .infinity)
     }
 }
@@ -673,6 +680,7 @@ struct EmptyPlaylistView: View{
 struct AudioFileButton: View {
     let audioFile: AudioFile
     @ObservedObject var audioManager: AudioManager
+    @EnvironmentObject var theme: ThemeManager
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
     @Binding var showingRenameAlert: Bool
@@ -717,6 +725,7 @@ struct AudioFileButton: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .background(Color(theme.backgroundColor))
         .contextMenu {
             if !isReorderMode {
                 if isMultiSelectMode && selectedFileIDs.contains(audioFile.id) {
@@ -800,6 +809,7 @@ struct AudioFileRow: View {
     let audioFile: AudioFile
     let isCurrentlyPlaying: Bool
     @ObservedObject var audioManager: AudioManager
+    @EnvironmentObject var theme: ThemeManager
     var isMultiSelectMode: Bool = false
     var isSelected: Bool = false
     
@@ -807,7 +817,7 @@ struct AudioFileRow: View {
         HStack {
             if isMultiSelectMode {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? .red : .gray)
+                    .foregroundStyle(isSelected ? theme.accentColor : theme.secondaryTextColor)
                     .font(.title2)
             }
             
@@ -821,14 +831,14 @@ struct AudioFileRow: View {
                     .overlay(RoundedRectangle(cornerRadius: 8)
                     .stroke(isCurrentlyPlaying ? Color.red : Color.clear, lineWidth: 2))
             } else {
-                Image(systemName: isCurrentlyPlaying ? "face.smiling.fill" : "face.smiling").foregroundStyle(isCurrentlyPlaying ? .red : .gray)
+                Image(systemName: isCurrentlyPlaying ? "face.smiling.fill" : "face.smiling").foregroundStyle(isCurrentlyPlaying ? theme.accentColor : theme.secondaryTextColor)
                     .font(.title2)
                     .frame(width: 35, height: 35)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(audioFile.title)
                     .font(.headline)
-                    .foregroundStyle(isCurrentlyPlaying ? .red : .primary)
+                    .foregroundStyle(isCurrentlyPlaying ? theme.accentColor : theme.textColor)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
@@ -836,11 +846,11 @@ struct AudioFileRow: View {
                     Text(audioFile.dateAdded, style: .date)
                     Text(formatTime(audioFile.audioDuration))
                 }
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(theme.secondaryTextColor)
                 .lineLimit(1)
             }
             Spacer()
-            if isCurrentlyPlaying && !isMultiSelectMode { Image(systemName: "speaker.wave.2.fill").foregroundStyle(.red).font(.caption) }
+            if isCurrentlyPlaying && !isMultiSelectMode { Image(systemName: "speaker.wave.2.fill").foregroundStyle(theme.accentColor).font(.caption) }
         }
         //.padding(.vertical, 4)
     }

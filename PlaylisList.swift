@@ -4,6 +4,7 @@ import PhotosUI
 struct PlaylistDetailView: View {
     let playlist: Playlist
     @ObservedObject var audioManager: AudioManager
+    @EnvironmentObject var theme: ThemeManager
     @Binding var navigateToPlayer: Bool
     @Binding var selectedAudioFile: AudioFile?
     @Binding var showingRenameAlert: Bool
@@ -25,7 +26,7 @@ struct PlaylistDetailView: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color(red: 0.15, green: 0.15, blue: 0.15)
+            Color(theme.backgroundColor)
                 .ignoresSafeArea()
             
             VStack {
@@ -33,12 +34,12 @@ struct PlaylistDetailView: View {
                     VStack(spacing: 20) {
                         Image(systemName: "music.note.list")
                             .font(.system(size: 60))
-                            .foregroundStyle(.red.opacity(0.8))
+                            .foregroundStyle(theme.accentColor.opacity(0.8))
                         Text("This playlist is empty")
-                            .foregroundStyle(.gray)
+                            .foregroundStyle(theme.secondaryTextColor)
                         Text("Go to Songs view and use the context menu to add songs here")
                             .font(.caption)
-                            .foregroundStyle(.gray)
+                            .foregroundStyle(theme.secondaryTextColor)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                     }
@@ -82,7 +83,7 @@ struct PlaylistDetailView: View {
                             let reorderedIDs = songs.map { $0.id }
                             audioManager.updatePlaylistOrder(playlist, with: reorderedIDs)
                         }
-                        .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
+                        .listRowBackground(Color(theme.backgroundColor))
                         .listRowSeparator(.hidden)
                         Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
                     }
@@ -100,7 +101,7 @@ struct PlaylistDetailView: View {
                 )
             }
         }
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .background(Color(theme.backgroundColor))
         .navigationTitle(playlist.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -115,7 +116,7 @@ struct PlaylistDetailView: View {
                             }
                         } label: {
                             Text("All")
-                                .foregroundStyle(.red)
+                                .foregroundStyle(theme.accentColor)
                         }
                     }
                     
@@ -128,7 +129,7 @@ struct PlaylistDetailView: View {
                                 isReorderMode = false
                             }
                         }
-                        .foregroundStyle(.red)
+                        .foregroundStyle(theme.accentColor)
                     } else {
                         Menu {
                             Button {
@@ -144,7 +145,7 @@ struct PlaylistDetailView: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
-                                .foregroundStyle(.red)
+                                .foregroundStyle(theme.accentColor)
                         }
                     }
                 }

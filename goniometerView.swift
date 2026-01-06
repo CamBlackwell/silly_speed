@@ -2,6 +2,8 @@ import SwiftUI
 
 struct GoniometerView: View {
     @ObservedObject var analyzer: UnifiedAudioAnalyser
+    @EnvironmentObject var theme: ThemeManager
+
 
     var body: some View {
         VStack(spacing: 4) {
@@ -87,8 +89,8 @@ struct GoniometerView: View {
                                 let midPoints = points.compactMap { $0.1 ? $0.0 : nil }
                                 let sidePoints = points.compactMap { !$0.1 ? $0.0 : nil }
 
-                                context.stroke(smoothPath(from: midPoints), with: .color(.purple.opacity(0.3)), lineWidth: 1)
-                                context.stroke(smoothPath(from: sidePoints), with: .color(.red.opacity(0.3)), lineWidth: 1)
+                    context.stroke(smoothPath(from: midPoints), with: .color(theme.gonioMidsColor.opacity(0.3)), lineWidth: 1)
+                    context.stroke(smoothPath(from: sidePoints), with: .color(theme.gonioSidesColor.opacity(0.3)), lineWidth: 1)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
