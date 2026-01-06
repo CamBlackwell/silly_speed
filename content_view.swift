@@ -20,8 +20,6 @@ struct ContentView: View {
     @State private var showingShareSheet = false
     @State private var shareURL: URL?
     @State private var artworkTarget: ArtworkTarget?
-    
-    // Multi-select states
     @State private var isMultiSelectMode = false
     @State private var selectedFileIDs: Set<UUID> = []
     @State private var showingBatchPlaylistMenu = false
@@ -91,7 +89,6 @@ struct ContentView: View {
 
                         Spacer()
                         
-                        // "All" button when in multi-select mode
                         if isMultiSelectMode {
                             Button {
                                 if selectedFileIDs.count == audioManager.displayedSongs.count {
@@ -330,7 +327,7 @@ struct SongsListView: View {
 
     var body: some View {
         List {
-            Color.clear.frame(height: 70).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
 
             ForEach(sortedSongs, id: \.id) { audioFile in
                 AudioFileButton(
@@ -354,15 +351,15 @@ struct SongsListView: View {
                 )
                 .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .listRowSeparator(.hidden)
+                
+
             }
             .onMove { source, destination in
                 if isMultiSelectMode && !selectedFileIDs.isEmpty {
-                    // Move selected files as a contiguous block
                     let selectedIndices = sortedSongs.enumerated()
                         .filter { selectedFileIDs.contains($0.element.id) }
                         .map { $0.offset }
                     
-                    // Only proceed if the dragged items are the selected ones
                     if source.allSatisfy({ selectedIndices.contains($0) }) {
                         audioManager.reorderSelectedSongs(
                             selectedIDs: Array(selectedFileIDs),
@@ -375,7 +372,7 @@ struct SongsListView: View {
                 }
             }
             
-            Color.clear.frame(height: 80).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -477,6 +474,7 @@ struct PlaylistsListView: View {
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))
     }
 }
+
 
 struct MiniPlayerBar: View {
     @ObservedObject var audioManager: AudioManager
@@ -612,7 +610,7 @@ struct PlaylistRowView: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 50, height: 50)
+                    .frame(width: 35, height: 35)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             } else {
@@ -698,7 +696,6 @@ struct AudioFileButton: View {
         .contextMenu {
             if !isReorderMode {
                 if isMultiSelectMode && selectedFileIDs.contains(audioFile.id) {
-                    // Multi-select context menu
                     MultiSelectContextMenu(
                         audioManager: audioManager,
                         selectedFileIDs: selectedFileIDs,
@@ -709,7 +706,6 @@ struct AudioFileButton: View {
                         showingBatchDeleteAlert: $showingBatchDeleteAlert
                     )
                 } else {
-                    // Single file context menu
                     AudioFileContextMenu(
                         audioFile: audioFile,
                         audioManager: audioManager,
@@ -792,21 +788,37 @@ struct AudioFileRow: View {
             }
             
             if let artworkName = audioFile.artworkImageName, let image = audioManager.loadArtworkImage(artworkName) {
-                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill).frame(width: 50, height: 50).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(isCurrentlyPlaying ? Color.red : Color.clear, lineWidth: 2))
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 35, height: 35)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                    .stroke(isCurrentlyPlaying ? Color.red : Color.clear, lineWidth: 2))
             } else {
-                Image(systemName: isCurrentlyPlaying ? "face.smiling.fill" : "face.smiling").foregroundStyle(isCurrentlyPlaying ? .red : .gray).font(.title2).frame(width: 50, height: 50)
+                Image(systemName: isCurrentlyPlaying ? "face.smiling.fill" : "face.smiling").foregroundStyle(isCurrentlyPlaying ? .red : .gray)
+                    .font(.title2)
+                    .frame(width: 35, height: 35)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(audioFile.title).font(.headline).foregroundStyle(isCurrentlyPlaying ? .red : .primary)
+                Text(audioFile.title)
+                    .font(.headline)
+                    .foregroundStyle(isCurrentlyPlaying ? .red : .primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 HStack {
                     Text(audioFile.dateAdded, style: .date)
                     Text(formatTime(audioFile.audioDuration))
-                }.font(.caption).foregroundStyle(.secondary)
+                }
+                .font(.caption).foregroundStyle(.secondary)
+                .lineLimit(1)
             }
             Spacer()
             if isCurrentlyPlaying && !isMultiSelectMode { Image(systemName: "speaker.wave.2.fill").foregroundStyle(.red).font(.caption) }
-        }.padding(.vertical, 4)
+        }
+        .padding(.vertical, 4)
     }
     private func formatTime(_ time: Float) -> String {
         let minutes = Int(time) / 60
