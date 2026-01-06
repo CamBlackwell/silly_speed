@@ -83,7 +83,10 @@ struct PlaylistDetailView: View {
                             audioManager.updatePlaylistOrder(playlist, with: reorderedIDs)
                         }
                         .listRowBackground(Color(red: 0.15, green: 0.15, blue: 0.15))
+                        .listRowSeparator(.hidden)
+                        Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
                     }
+                    .listStyle(PlainListStyle())
                     .scrollContentBackground(.hidden)
                     .environment(\.editMode, isReorderMode ? .constant(.active) : .constant(.inactive))
                 }
@@ -103,7 +106,6 @@ struct PlaylistDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 12) {
-                    // "All" button when in multi-select mode
                     if isMultiSelectMode {
                         Button {
                             if selectedFileIDs.count == playlistSongs.count {
@@ -247,7 +249,6 @@ struct PlaylistAudioFileButton: View {
         .contextMenu {
             if !isReorderMode {
                 if isMultiSelectMode && selectedFileIDs.contains(audioFile.id) {
-                    // Multi-select context menu with Remove option
                     PlaylistMultiSelectContextMenu(
                         audioManager: audioManager,
                         playlist: playlist,
@@ -260,7 +261,6 @@ struct PlaylistAudioFileButton: View {
                         showingBatchDeleteAlert: $showingBatchDeleteAlert
                     )
                 } else {
-                    // Single file context menu with Remove option
                     PlaylistAudioFileContextMenu(
                         audioFile: audioFile,
                         playlist: playlist,

@@ -433,7 +433,7 @@ struct PlaylistsListView: View {
     
     var body: some View {
         List {
-            Color.clear.frame(height: 70).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
             
             ForEach(sortedPlaylists) { playlist in
                 NavigationLink(destination: PlaylistDetailView(
@@ -467,7 +467,7 @@ struct PlaylistsListView: View {
                     Button(role: .destructive) { audioManager.deletePlaylist(playlist) } label: { Label("Delete", systemImage: "trash") }
                 }
             }
-            Color.clear.frame(height: 80).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -632,7 +632,6 @@ struct PlaylistRowView: View {
 
             Spacer()
         }
-        .padding(.vertical, 8)
     }
 }
 
@@ -818,7 +817,7 @@ struct AudioFileRow: View {
             Spacer()
             if isCurrentlyPlaying && !isMultiSelectMode { Image(systemName: "speaker.wave.2.fill").foregroundStyle(.red).font(.caption) }
         }
-        .padding(.vertical, 4)
+        //.padding(.vertical, 4)
     }
     private func formatTime(_ time: Float) -> String {
         let minutes = Int(time) / 60
