@@ -14,17 +14,8 @@ struct AudioPlayerView: View {
         ZStack {
             Color(theme.backgroundColor)
                 .ignoresSafeArea()
-            
-            
 
             VStack(spacing: 8) {
-                /*Text(activeFile?.title ?? audioFile.title)
-                    .font(.title2)
-                    .fontDesign(.serif)
-                    .fontWeight(.heavy)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(1) */
-
                 HStack {
                     algorithmSelector
                     visualisationSelector
@@ -41,14 +32,20 @@ struct AudioPlayerView: View {
             }
             .padding()
         }
-        .navigationTitle(activeFile?.title ?? audioFile.title)
+        .navigationTitle(currentFile.title)
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
-        .onChange(of: audioManager.currentlyPlayingID) { oldID, newID in
-            if let newID = newID, newID != audioFile.id {
+        .onChange(of: audioManager.currentlyPlayingID) { _, newID in
+            if let newID = newID, newID != currentFile.id {
                 sliderValue = 0
             }
         }
+    }
+
+    private var currentFile: AudioFile {
+        audioManager.audioFiles.first(where: {
+            $0.id == audioManager.currentlyPlayingID
+        }) ?? audioFile
     }
 
     private var visualisationSelector: some View {
@@ -107,8 +104,7 @@ struct AudioPlayerView: View {
                 .transition(.scale.combined(with: .opacity))
 
         case .albumArt:
-            if let activeFile = activeFile,
-               let name = activeFile.artworkImageName,
+            if let name = currentFile.artworkImageName,
                let artwork = audioManager.loadArtworkImage(name) {
                 Image(uiImage: artwork)
                     .resizable()
@@ -130,12 +126,8 @@ struct AudioPlayerView: View {
         }
     }
 
-    private var activeFile: AudioFile? {
-        audioManager.audioFiles.first(where: { $0.id == audioManager.currentlyPlayingID })
-    }
-
     private var isThisFilePlaying: Bool {
-        audioManager.isPlaying && audioManager.currentlyPlayingID != nil
+        audioManager.isPlaying && audioManager.currentlyPlayingID == currentFile.id
     }
 
     private func formatTime(_ time: TimeInterval) -> String {
@@ -188,7 +180,7 @@ struct AudioPlayerView: View {
             )
             .tint(theme.accentColor)
             .disabled(audioManager.currentlyPlayingID == nil)
-            .onChange(of: audioManager.currentTime) { oldTime, newTime in
+            .onChange(of: audioManager.currentTime) { _, newTime in
                 if !isDragging {
                     sliderValue = newTime
                 }
@@ -211,7 +203,7 @@ struct AudioPlayerView: View {
     private var playbackControls: some View {
         ZStack {
             HStack(spacing: 40) {
-                Button(action: { audioManager.skipPreviousSong()}) {
+                Button(action: { audioManager.skipPreviousSong() }) {
                     Image(systemName: "backward.fill")
                         .font(.title)
                         .foregroundStyle(theme.accentColor)
@@ -219,10 +211,10 @@ struct AudioPlayerView: View {
                 .buttonStyle(PlainButtonStyle())
 
                 Button(action: {
-                    if audioManager.currentlyPlayingID != nil {
+                    if audioManager.currentlyPlayingID == currentFile.id {
                         audioManager.togglePlayPause()
                     } else {
-                        audioManager.play(audioFile: audioFile)
+                        audioManager.play(audioFile: currentFile)
                     }
                 }) {
                     ZStack {

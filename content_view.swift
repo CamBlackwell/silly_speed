@@ -5,194 +5,172 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @StateObject private var audioManager = AudioManager()
     @EnvironmentObject var theme: ThemeManager
+
     @State private var showingFilePicker = false
     @State private var navigateToPlayer = false
     @State private var selectedAudioFile: AudioFile?
+
     @State private var libraryFilter: LibraryFilter = .songs
+
     @State private var showingCreatePlaylistAlert = false
     @State private var newPlaylistName = ""
+
     @State private var showingRenameAlert = false
     @State private var renamingAudioFile: AudioFile?
     @State private var newFileName = ""
+
     @State private var showingRenamePlaylistAlert = false
     @State private var renamingPlaylist: Playlist?
     @State private var newPlaylistNameRename = ""
+
     @State private var isReorderMode = false
+
     @State private var showingShareSheet = false
     @State private var shareURL: URL?
+
     @State private var artworkTarget: ArtworkTarget?
+
     @State private var isMultiSelectMode = false
     @State private var selectedFileIDs: Set<UUID> = []
+
     @State private var showingBatchPlaylistMenu = false
     @State private var showingBatchDeleteAlert = false
-    @State private var showingSongView = true
+
     @State private var showingSettings = false
+
     
-
-    var shouldShowEmptyPlaylistView: Bool {
-        audioManager.playlists.count == 1 && !showingSongView
-    }
-
-    var shouldShowEmptySongsView: Bool {
-        audioManager.audioFiles.isEmpty && showingSongView
-    }
-
+    
     var body: some View {
         NavigationStack {
-            mainContent
-                .toolbar { toolbarContent }
-                .applySheets(
-                    showingFilePicker: $showingFilePicker,
-                    showingSettings: $showingSettings,
-                    showingShareSheet: $showingShareSheet,
-                    shareURL: $shareURL,
-                    artworkTarget: $artworkTarget,
-                    audioManager: audioManager
-                )
-                .applyAlerts(
-                    showingBatchPlaylistMenu: $showingBatchPlaylistMenu,
-                    showingBatchDeleteAlert: $showingBatchDeleteAlert,
-                    showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
-                    showingRenameAlert: $showingRenameAlert,
-                    showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
-                    newPlaylistName: $newPlaylistName,
-                    newFileName: $newFileName,
-                    newPlaylistNameRename: $newPlaylistNameRename,
-                    renamingAudioFile: $renamingAudioFile,
-                    renamingPlaylist: $renamingPlaylist,
-                    selectedFileIDs: $selectedFileIDs,
-                    isMultiSelectMode: $isMultiSelectMode,
-                    audioManager: audioManager
-                )
-                .navigationDestination(isPresented: $navigateToPlayer) {
-                    if let audioFile = selectedAudioFile {
-                        AudioPlayerView(
-                            audioFile: audioFile,
-                            audioManager: audioManager
+            ZStack(alignment: .bottom) {
+                Color(theme.backgroundColor)
+                    .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    TabView(selection: $libraryFilter) {
+                        playlistsPage
+                            .tag(LibraryFilter.playlists)
+
+                        songsPage
+                            .tag(LibraryFilter.songs)
+
+                        playerPage
+                            .tag(LibraryFilter.player)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+
+                    if audioManager.currentlyPlayingID != nil
+                        && !isMultiSelectMode
+                        && libraryFilter != .player {
+                        Divider()
+                        MiniPlayerBar(
+                            audioManager: audioManager,
+                            navigateToPlayer: $navigateToPlayer,
+                            selectedAudioFile: $selectedAudioFile
                         )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
+                    if libraryFilter != .player {
+                        bottomTabBar
                     }
                 }
+            }
+            .toolbar { toolbarContent }
+            .applySheets(
+                showingFilePicker: $showingFilePicker,
+                showingSettings: $showingSettings,
+                showingShareSheet: $showingShareSheet,
+                shareURL: $shareURL,
+                artworkTarget: $artworkTarget,
+                audioManager: audioManager
+            )
+            .applyAlerts(
+                showingBatchPlaylistMenu: $showingBatchPlaylistMenu,
+                showingBatchDeleteAlert: $showingBatchDeleteAlert,
+                showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
+                showingRenameAlert: $showingRenameAlert,
+                showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
+                newPlaylistName: $newPlaylistName,
+                newFileName: $newFileName,
+                newPlaylistNameRename: $newPlaylistNameRename,
+                renamingAudioFile: $renamingAudioFile,
+                renamingPlaylist: $renamingPlaylist,
+                selectedFileIDs: $selectedFileIDs,
+                isMultiSelectMode: $isMultiSelectMode,
+                audioManager: audioManager
+            )
+            .onChange(of: navigateToPlayer) { _, newValue in
+                if newValue {
+                    libraryFilter = .player
+                    navigateToPlayer = false
+                }
+            }
         }
         .tint(theme.accentColor)
     }
 
-    private var mainContent: some View {
-        ZStack(alignment: .bottom) {
-            Color(theme.backgroundColor)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                TabView(selection: $libraryFilter) {
-                    Group {
-                        if shouldShowEmptyPlaylistView {
-                            EmptyPlaylistView(
-                                showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
-                                newPlaylistName: $newPlaylistName
-                            )
-                        } else {
-                            PlaylistsListView(
-                                audioManager: audioManager,
-                                navigateToPlayer: $navigateToPlayer,
-                                selectedAudioFile: $selectedAudioFile,
-                                showingRenameAlert: $showingRenameAlert,
-                                renamingAudioFile: $renamingAudioFile,
-                                newFileName: $newFileName,
-                                showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
-                                renamingPlaylist: $renamingPlaylist,
-                                newPlaylistNameRename: $newPlaylistNameRename,
-                                artworkTarget: $artworkTarget,
-                                showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
-                                newPlaylistName: $newPlaylistName
-                            )
-                        }
-                    }
-                    .tag(LibraryFilter.playlists)
-                    
-                    Group {
-                        if shouldShowEmptySongsView {
-                            EmptySongStateView(showingFilePicker: $showingFilePicker)
-                        } else {
-                            SongsListView(
-                                audioManager: audioManager,
-                                navigateToPlayer: $navigateToPlayer,
-                                selectedAudioFile: $selectedAudioFile,
-                                showingRenameAlert: $showingRenameAlert,
-                                renamingAudioFile: $renamingAudioFile,
-                                newFileName: $newFileName,
-                                isReorderMode: $isReorderMode,
-                                artworkTarget: $artworkTarget,
-                                isMultiSelectMode: $isMultiSelectMode,
-                                selectedFileIDs: $selectedFileIDs,
-                                showingFilePicker: $showingFilePicker
-                            )
-                        }
-                    }
-                    .tag(LibraryFilter.songs)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .onChange(of: libraryFilter) { oldValue, newValue in
-                    showingSongView = (newValue == .songs)
-                }
-                
-                if audioManager.currentlyPlayingID != nil && !isMultiSelectMode {
-                    Divider()
-                    MiniPlayerBar(
-                        audioManager: audioManager,
-                        navigateToPlayer: $navigateToPlayer,
-                        selectedAudioFile: $selectedAudioFile
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                
-                bottomTabBar
+    private var playlistsPage: some View {
+        ZStack {
+            if audioManager.playlists.count == 1 {
+                EmptyPlaylistView(
+                    showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
+                    newPlaylistName: $newPlaylistName
+                )
+            } else {
+                PlaylistsListView(
+                    audioManager: audioManager,
+                    navigateToPlayer: $navigateToPlayer,
+                    selectedAudioFile: $selectedAudioFile,
+                    showingRenameAlert: $showingRenameAlert,
+                    renamingAudioFile: $renamingAudioFile,
+                    newFileName: $newFileName,
+                    showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
+                    renamingPlaylist: $renamingPlaylist,
+                    newPlaylistNameRename: $newPlaylistNameRename,
+                    artworkTarget: $artworkTarget,
+                    showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
+                    newPlaylistName: $newPlaylistName
+                )
             }
         }
     }
 
-
-    private var bottomTabBar: some View {
-        HStack(spacing: 0) {
-            BottomTabButton(
-                icon: "music.note.list",
-                title: "Playlists",
-                isSelected: libraryFilter == .playlists,
-                action: {
-                    libraryFilter = .playlists
-                    showingSongView = false
-                }
-            )
-
-            BottomTabButton(
-                icon: "music.note",
-                title: "Songs",
-                isSelected: libraryFilter == .songs,
-                action: {
-                    libraryFilter = .songs
-                    showingSongView = true
-                }
-            )
-
-            BottomTabButton(
-                icon: "play.circle.fill",
-                title: "Player",
-                isSelected: false,
-                isDisabled: audioManager.currentlyPlayingID == nil,
-                action: {
-                    if let currentFile = audioManager.audioFiles.first(where: {
-                        $0.id == audioManager.currentlyPlayingID
-                    }) {
-                        selectedAudioFile = currentFile
-                        navigateToPlayer = true
-                    }
-                }
-            )
+    private var songsPage: some View {
+        ZStack {
+            if audioManager.audioFiles.isEmpty {
+                EmptySongStateView(showingFilePicker: $showingFilePicker)
+            } else {
+                SongsListView(
+                    audioManager: audioManager,
+                    navigateToPlayer: $navigateToPlayer,
+                    selectedAudioFile: $selectedAudioFile,
+                    showingRenameAlert: $showingRenameAlert,
+                    renamingAudioFile: $renamingAudioFile,
+                    newFileName: $newFileName,
+                    isReorderMode: $isReorderMode,
+                    artworkTarget: $artworkTarget,
+                    isMultiSelectMode: $isMultiSelectMode,
+                    selectedFileIDs: $selectedFileIDs,
+                    showingFilePicker: $showingFilePicker
+                )
+            }
         }
-        .frame(height: 45)
-        .background(.ultraThinMaterial)
-        .padding(.bottom, 0)
-        .ignoresSafeArea(edges: .bottom)
     }
 
+    private var playerPage: some View {
+        ZStack {
+            if let file = selectedAudioFile {
+                AudioPlayerView(
+                    audioFile: file,
+                    audioManager: audioManager
+                )
+            } else {
+                Color.clear
+            }
+        }
+    }
+    
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarLeading) {
@@ -203,7 +181,7 @@ struct ContentView: View {
             trailingToolbarButton
         }
     }
-
+    
     private var leadingToolbarButton: some View {
         Group {
             if !isReorderMode && !isMultiSelectMode {
@@ -217,14 +195,10 @@ struct ContentView: View {
                 }
             } else if isMultiSelectMode {
                 Button {
-                    if selectedFileIDs.count
-                        == audioManager.displayedSongs.count
-                    {
+                    if selectedFileIDs.count == audioManager.displayedSongs.count {
                         selectedFileIDs.removeAll()
                     } else {
-                        selectedFileIDs = Set(
-                            audioManager.displayedSongs.map { $0.id }
-                        )
+                        selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
                     }
                 } label: {
                     Text("Select All")
@@ -233,7 +207,7 @@ struct ContentView: View {
             }
         }
     }
-
+    
     private var trailingToolbarButton: some View {
         Group {
             if isReorderMode || isMultiSelectMode {
@@ -255,25 +229,25 @@ struct ContentView: View {
                     } label: {
                         Label("Add Songs", systemImage: "music.note.list")
                     }
+
                     Button {
                         newPlaylistName = ""
                         showingCreatePlaylistAlert = true
                     } label: {
                         Label("Create Playlist", systemImage: "text.badge.plus")
                     }
+
                     Button {
                         showingSettings = true
                     } label: {
                         Label("Settings", systemImage: "gear")
                     }
+
                     if libraryFilter == .songs {
                         Button {
                             isReorderMode = true
                         } label: {
-                            Label(
-                                "Reorder Songs",
-                                systemImage: "arrow.up.arrow.down"
-                            )
+                            Label("Reorder Songs", systemImage: "arrow.up.arrow.down")
                         }
                     }
                 } label: {
@@ -284,7 +258,46 @@ struct ContentView: View {
             }
         }
     }
+
+
+    private var bottomTabBar: some View {
+        HStack(spacing: 0) {
+            BottomTabButton(
+                icon: "music.note.list",
+                title: "Playlists",
+                isSelected: libraryFilter == .playlists,
+                action: { libraryFilter = .playlists }
+            )
+
+            BottomTabButton(
+                icon: "music.note",
+                title: "Songs",
+                isSelected: libraryFilter == .songs,
+                action: { libraryFilter = .songs }
+            )
+
+            BottomTabButton(
+                icon: "play.circle.fill",
+                title: "Player",
+                isSelected: libraryFilter == .player,
+                isDisabled: audioManager.currentlyPlayingID == nil,
+                action: {
+                    if let currentFile = audioManager.audioFiles.first(where: {
+                        $0.id == audioManager.currentlyPlayingID
+                    }) {
+                        selectedAudioFile = currentFile
+                        libraryFilter = .player
+                    }
+                }
+            )
+        }
+        .frame(height: 45)
+        .background(.ultraThinMaterial)
+        .ignoresSafeArea(edges: .bottom)
+    }
 }
+
+
 
 struct BottomTabButton: View {
     @EnvironmentObject var theme: ThemeManager
@@ -517,6 +530,13 @@ struct LibraryListView: View {
                 showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
                 newPlaylistName: $newPlaylistName
             )
+        case .player:
+            if let audioFile = selectedAudioFile {
+                AudioPlayerView(
+                    audioFile: audioFile,
+                    audioManager: audioManager
+                )
+            }
         }
     }
 }
