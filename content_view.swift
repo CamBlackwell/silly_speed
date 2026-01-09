@@ -38,162 +38,246 @@ struct ContentView: View {
     
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
-                Color(theme.backgroundColor)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    if shouldShowEmptySongsView {
-                        EmptySongStateView()
-                    } else if shouldShowEmptyPlaylistView {
-                        EmptyPlaylistView()
-                    } else {
-                        LibraryListView(
-                            audioManager: audioManager,
-                            filter: libraryFilter,
-                            navigateToPlayer: $navigateToPlayer,
-                            selectedAudioFile: $selectedAudioFile,
-                            showingRenameAlert: $showingRenameAlert,
-                            renamingAudioFile: $renamingAudioFile,
-                            newFileName: $newFileName,
-                            showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
-                            renamingPlaylist: $renamingPlaylist,
-                            newPlaylistNameRename: $newPlaylistNameRename,
-                            isReorderMode: $isReorderMode,
-                            artworkTarget: $artworkTarget,
-                            isMultiSelectMode: $isMultiSelectMode,
-                            selectedFileIDs: $selectedFileIDs
-                        )
+            mainContent
+                .toolbar { toolbarContent }
+                .applySheets(
+                    showingFilePicker: $showingFilePicker,
+                    showingSettings: $showingSettings,
+                    showingShareSheet: $showingShareSheet,
+                    shareURL: $shareURL,
+                    artworkTarget: $artworkTarget,
+                    audioManager: audioManager
+                )
+                .applyAlerts(
+                    showingBatchPlaylistMenu: $showingBatchPlaylistMenu,
+                    showingBatchDeleteAlert: $showingBatchDeleteAlert,
+                    showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
+                    showingRenameAlert: $showingRenameAlert,
+                    showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
+                    newPlaylistName: $newPlaylistName,
+                    newFileName: $newFileName,
+                    newPlaylistNameRename: $newPlaylistNameRename,
+                    renamingAudioFile: $renamingAudioFile,
+                    renamingPlaylist: $renamingPlaylist,
+                    selectedFileIDs: $selectedFileIDs,
+                    isMultiSelectMode: $isMultiSelectMode,
+                    audioManager: audioManager
+                )
+                .navigationDestination(isPresented: $navigateToPlayer) {
+                    if let audioFile = selectedAudioFile {
+                        AudioPlayerView(audioFile: audioFile, audioManager: audioManager)
                     }
-                    
-                    if audioManager.currentlyPlayingID != nil && !isMultiSelectMode {
-                        Divider()
-                        MiniPlayerBar(
-                            audioManager: audioManager,
-                            navigateToPlayer: $navigateToPlayer,
-                            selectedAudioFile: $selectedAudioFile
-                        )
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
-                    
-                    HStack(spacing: 0) {
-                        Button {
-                            libraryFilter = .playlists
-                            showingSongView = false
-                        } label: {
-                            VStack(spacing: 2) {
-                                Image(systemName: "music.note.list")
-                                    .font(.title3)
-                                Text("Playlists")
-                                    .font(.system(size: 10))
-                            }
-                            .foregroundStyle(libraryFilter == .playlists ? theme.accentColor : theme.secondaryTextColor)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 10)
-                            .padding(.bottom, 0)
-                        }
-                        
-                        Button {
-                            libraryFilter = .songs
-                            showingSongView = true
-                        } label: {
-                            VStack(spacing: 2) {
-                                Image(systemName: "music.note")
-                                    .font(.title3)
-                                Text("Songs")
-                                    .font(.system(size: 10))
-                            }
-                            .foregroundStyle(libraryFilter == .songs ? theme.accentColor : theme.secondaryTextColor)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 10)
-                            .padding(.bottom, 0)
-                        }
-                        
-                        Button {
-                            if let currentFile = audioManager.audioFiles.first(where: { $0.id == audioManager.currentlyPlayingID }) {
-                                selectedAudioFile = currentFile
-                                navigateToPlayer = true
-                            }
-                        } label: {
-                            VStack(spacing: 2) {
-                                Image(systemName: "play.circle.fill")
-                                    .font(.title3)
-                                Text("Player")
-                                    .font(.system(size: 10))
-                            }
-                            //.foregroundStyle(navigateToPlayer ? theme.accentColor : theme.secondaryTextColor)
-                            .foregroundStyle(theme.secondaryTextColor)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 10)
-                            .padding(.bottom, 0)
-                        }
-                        .disabled(audioManager.currentlyPlayingID == nil)
-                    }
-                    .frame(height: 45)
-                    .background(.ultraThinMaterial)
-                    .padding(.bottom, 0)
-                    //.padding(.top, 50)
-                    .ignoresSafeArea(edges: .bottom)
                 }
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if isReorderMode || isMultiSelectMode {
-                        Button {
-                            if isReorderMode {
-                                isReorderMode = false
-                            } else {
-                                isMultiSelectMode = false
-                                selectedFileIDs.removeAll()
-                            }
-                        } label: {
-                            Text("Done")
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(.red)
-                                .clipShape(Capsule())
-                        }
-                    } else {
-                        Menu {
-                            Button { showingFilePicker = true } label: { Label("Add Songs", systemImage: "music.note.list") }
-                            Button {
-                                newPlaylistName = ""
-                                showingCreatePlaylistAlert = true
-                            } label: { Label("Create Playlist", systemImage: "text.badge.plus") }
-                            if libraryFilter == .songs {
-                                Button {
-                                    isMultiSelectMode = true
-                                    selectedFileIDs.removeAll()
-                                } label: { Label("Select Multiple", systemImage: "checkmark.circle") }
-                                Button { isReorderMode = true } label: { Label("Reorder Songs", systemImage: "arrow.up.arrow.down") }
-                            }
-                            Button { showingSettings = true } label: { Label("Settings", systemImage: "gear") }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.title2)
-                                .foregroundStyle(theme.accentColor)
-                        }
-                    }
+        }
+        .tint(theme.accentColor)
+    }
+    
+    private var mainContent: some View {
+        ZStack(alignment: .bottom) {
+            Color(theme.backgroundColor)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                contentSection
+                
+                if audioManager.currentlyPlayingID != nil && !isMultiSelectMode {
+                    Divider()
+                    MiniPlayerBar(
+                        audioManager: audioManager,
+                        navigateToPlayer: $navigateToPlayer,
+                        selectedAudioFile: $selectedAudioFile
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if isMultiSelectMode {
-                        Button {
-                            if selectedFileIDs.count == audioManager.displayedSongs.count {
-                                selectedFileIDs.removeAll()
-                            } else {
-                                selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
-                            }
-                        } label: {
-                            Text("Select All")
-                                .foregroundStyle(theme.accentColor)
-                        }
+                bottomTabBar
+            }
+        }
+    }
+    
+    private var contentSection: some View {
+        Group {
+            if shouldShowEmptySongsView {
+                EmptySongStateView()
+            } else if shouldShowEmptyPlaylistView {
+                EmptyPlaylistView()
+            } else {
+                LibraryListView(
+                    audioManager: audioManager,
+                    filter: libraryFilter,
+                    navigateToPlayer: $navigateToPlayer,
+                    selectedAudioFile: $selectedAudioFile,
+                    showingRenameAlert: $showingRenameAlert,
+                    renamingAudioFile: $renamingAudioFile,
+                    newFileName: $newFileName,
+                    showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
+                    renamingPlaylist: $renamingPlaylist,
+                    newPlaylistNameRename: $newPlaylistNameRename,
+                    isReorderMode: $isReorderMode,
+                    artworkTarget: $artworkTarget,
+                    isMultiSelectMode: $isMultiSelectMode,
+                    selectedFileIDs: $selectedFileIDs
+                )
+            }
+        }
+    }
+    
+    private var bottomTabBar: some View {
+        HStack(spacing: 0) {
+            BottomTabButton(
+                icon: "music.note.list",
+                title: "Playlists",
+                isSelected: libraryFilter == .playlists,
+                action: {
+                    libraryFilter = .playlists
+                    showingSongView = false
+                }
+            )
+            
+            BottomTabButton(
+                icon: "music.note",
+                title: "Songs",
+                isSelected: libraryFilter == .songs,
+                action: {
+                    libraryFilter = .songs
+                    showingSongView = true
+                }
+            )
+            
+            BottomTabButton(
+                icon: "play.circle.fill",
+                title: "Player",
+                isSelected: false,
+                isDisabled: audioManager.currentlyPlayingID == nil,
+                action: {
+                    if let currentFile = audioManager.audioFiles.first(where: { $0.id == audioManager.currentlyPlayingID }) {
+                        selectedAudioFile = currentFile
+                        navigateToPlayer = true
                     }
                 }
+            )
+        }
+        .frame(height: 45)
+        .background(.ultraThinMaterial)
+        .padding(.bottom, 0)
+        .ignoresSafeArea(edges: .bottom)
+    }
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            leadingToolbarButton
+        }
+        
+        ToolbarItem(placement: .navigationBarTrailing) {
+            trailingToolbarButton
+        }
+    }
+    
+    private var leadingToolbarButton: some View {
+        Group {
+            if !isReorderMode && !isMultiSelectMode {
+                Button {
+                    isMultiSelectMode = true
+                    selectedFileIDs.removeAll()
+                } label: {
+                    Image(systemName: "checkmark.circle")
+                        .font(.title2)
+                        .foregroundStyle(theme.accentColor)
+                }
+            } else if isMultiSelectMode {
+                Button {
+                    if selectedFileIDs.count == audioManager.displayedSongs.count {
+                        selectedFileIDs.removeAll()
+                    } else {
+                        selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
+                    }
+                } label: {
+                    Text("Select All")
+                        .foregroundStyle(theme.accentColor)
+                }
             }
-            .sheet(isPresented: $showingFilePicker) { DocumentPicker(audioManager: audioManager) }
-            .sheet(item: $artworkTarget) { target in
+        }
+    }
+    
+    private var trailingToolbarButton: some View {
+        Group {
+            if isReorderMode || isMultiSelectMode {
+                Button {
+                    if isReorderMode {
+                        isReorderMode = false
+                    } else {
+                        isMultiSelectMode = false
+                        selectedFileIDs.removeAll()
+                    }
+                } label: {
+                    Text("Done")
+                        .foregroundStyle(theme.accentColor)
+                }
+            } else {
+                Menu {
+                    Button { showingFilePicker = true } label: { Label("Add Songs", systemImage: "music.note.list") }
+                    Button {
+                        newPlaylistName = ""
+                        showingCreatePlaylistAlert = true
+                    } label: { Label("Create Playlist", systemImage: "text.badge.plus") }
+                    Button { showingSettings = true } label: { Label("Settings", systemImage: "gear") }
+                    if libraryFilter == .songs {
+                        Button { isReorderMode = true } label: { Label("Reorder Songs", systemImage: "arrow.up.arrow.down") }
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.title2)
+                        .foregroundStyle(theme.accentColor)
+                }
+            }
+        }
+    }
+}
+
+struct BottomTabButton: View {
+    @EnvironmentObject var theme: ThemeManager
+    let icon: String
+    let title: String
+    let isSelected: Bool
+    var isDisabled: Bool = false
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Image(systemName: icon)
+                    .font(.title3)
+                Text(title)
+                    .font(.system(size: 10))
+            }
+            .foregroundStyle(isSelected ? theme.accentColor : theme.secondaryTextColor)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 10)
+            .padding(.bottom, 0)
+        }
+        .disabled(isDisabled)
+    }
+}
+
+extension View {
+    func applySheets(
+        showingFilePicker: Binding<Bool>,
+        showingSettings: Binding<Bool>,
+        showingShareSheet: Binding<Bool>,
+        shareURL: Binding<URL?>,
+        artworkTarget: Binding<ArtworkTarget?>,
+        audioManager: AudioManager
+    ) -> some View {
+        self
+            .sheet(isPresented: showingFilePicker) { DocumentPicker(audioManager: audioManager) }
+            .sheet(isPresented: showingSettings) { SettingsView() }
+            .sheet(isPresented: showingShareSheet) {
+                if let url = shareURL.wrappedValue {
+                    ShareSheet(activityItems: [url])
+                }
+            }
+            .sheet(item: artworkTarget) { target in
                 PhotoPicker { image in
                     switch target {
                     case .audioFile(let file):
@@ -209,19 +293,29 @@ struct ContentView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingShareSheet) {
-                if let url = shareURL {
-                    ShareSheet(activityItems: [url])
-                }
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
-            }
-            .confirmationDialog("Add to Playlist", isPresented: $showingBatchPlaylistMenu) {
+    }
+    
+    func applyAlerts(
+        showingBatchPlaylistMenu: Binding<Bool>,
+        showingBatchDeleteAlert: Binding<Bool>,
+        showingCreatePlaylistAlert: Binding<Bool>,
+        showingRenameAlert: Binding<Bool>,
+        showingRenamePlaylistAlert: Binding<Bool>,
+        newPlaylistName: Binding<String>,
+        newFileName: Binding<String>,
+        newPlaylistNameRename: Binding<String>,
+        renamingAudioFile: Binding<AudioFile?>,
+        renamingPlaylist: Binding<Playlist?>,
+        selectedFileIDs: Binding<Set<UUID>>,
+        isMultiSelectMode: Binding<Bool>,
+        audioManager: AudioManager
+    ) -> some View {
+        self
+            .confirmationDialog("Add to Playlist", isPresented: showingBatchPlaylistMenu) {
                 let playlists = audioManager.sortedPlaylists
                 ForEach(playlists) { playlist in
                     Button(playlist.name) {
-                        for fileID in selectedFileIDs {
+                        for fileID in selectedFileIDs.wrappedValue {
                             if let file = audioManager.audioFiles.first(where: { $0.id == fileID }) {
                                 audioManager.addAudioFile(file, to: playlist)
                             }
@@ -230,67 +324,67 @@ struct ContentView: View {
                 }
                 Button("Cancel", role: .cancel) { }
             }
-            .alert("Delete Selected Files", isPresented: $showingBatchDeleteAlert) {
+            .alert("Delete Selected Files", isPresented: showingBatchDeleteAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
-                    for fileID in selectedFileIDs {
+                    for fileID in selectedFileIDs.wrappedValue {
                         if let file = audioManager.audioFiles.first(where: { $0.id == fileID }) {
                             audioManager.deleteAudioFile(file)
                         }
                     }
-                    selectedFileIDs.removeAll()
-                    isMultiSelectMode = false
+                    selectedFileIDs.wrappedValue.removeAll()
+                    isMultiSelectMode.wrappedValue = false
                 }
             } message: {
-                Text("Are you sure you want to delete \(selectedFileIDs.count) file(s)? This action cannot be undone.")
+                Text("Are you sure you want to delete \(selectedFileIDs.wrappedValue.count) file(s)? This action cannot be undone.")
             }
-            .alert("New Playlist", isPresented: $showingCreatePlaylistAlert) {
-                TextField("Playlist Name", text: $newPlaylistName)
+            .alert("New Playlist", isPresented: showingCreatePlaylistAlert) {
+                TextField("Playlist Name", text: newPlaylistName)
                 Button("Cancel", role: .cancel) { }
-                Button("Create") { if !newPlaylistName.isEmpty { audioManager.createPlaylist(name: newPlaylistName) } }
+                Button("Create") {
+                    if !newPlaylistName.wrappedValue.isEmpty {
+                        audioManager.createPlaylist(name: newPlaylistName.wrappedValue)
+                    }
+                }
             }
-            .alert("Rename File", isPresented: $showingRenameAlert) {
-                TextField("New Name", text: $newFileName)
+            .alert("Rename File", isPresented: showingRenameAlert) {
+                TextField("New Name", text: newFileName)
                 Button("Cancel", role: .cancel) {
-                    renamingAudioFile = nil
-                    newFileName = ""
+                    renamingAudioFile.wrappedValue = nil
+                    newFileName.wrappedValue = ""
                 }
                 Button("Rename") {
-                    if let audioFile = renamingAudioFile, !newFileName.isEmpty {
-                        audioManager.renameAudioFile(audioFile, to: newFileName)
+                    if let audioFile = renamingAudioFile.wrappedValue, !newFileName.wrappedValue.isEmpty {
+                        audioManager.renameAudioFile(audioFile, to: newFileName.wrappedValue)
                     }
-                    renamingAudioFile = nil
-                    newFileName = ""
+                    renamingAudioFile.wrappedValue = nil
+                    newFileName.wrappedValue = ""
                 }
             } message: {
-                if let audioFile = renamingAudioFile { Text("Enter a new name for '\(audioFile.title)'") }
+                if let audioFile = renamingAudioFile.wrappedValue {
+                    Text("Enter a new name for '\(audioFile.title)'")
+                }
             }
-            .alert("Rename Playlist", isPresented: $showingRenamePlaylistAlert) {
-                TextField("New Name", text: $newPlaylistNameRename)
+            .alert("Rename Playlist", isPresented: showingRenamePlaylistAlert) {
+                TextField("New Name", text: newPlaylistNameRename)
                 Button("Cancel", role: .cancel) {
-                    renamingPlaylist = nil
-                    newPlaylistNameRename = ""
+                    renamingPlaylist.wrappedValue = nil
+                    newPlaylistNameRename.wrappedValue = ""
                 }
                 Button("Rename") {
-                    if let playlist = renamingPlaylist, !newPlaylistNameRename.isEmpty {
-                        audioManager.renamePlaylist(playlist, to: newPlaylistNameRename)
+                    if let playlist = renamingPlaylist.wrappedValue, !newPlaylistNameRename.wrappedValue.isEmpty {
+                        audioManager.renamePlaylist(playlist, to: newPlaylistNameRename.wrappedValue)
                     }
-                    renamingPlaylist = nil
-                    newPlaylistNameRename = ""
+                    renamingPlaylist.wrappedValue = nil
+                    newPlaylistNameRename.wrappedValue = ""
                 }
             } message: {
-                if let playlist = renamingPlaylist { Text("Enter a new name for '\(playlist.name)'") }
-            }
-            .navigationDestination(isPresented: $navigateToPlayer) {
-                if let audioFile = selectedAudioFile {
-                    AudioPlayerView(audioFile: audioFile, audioManager: audioManager)
+                if let playlist = renamingPlaylist.wrappedValue {
+                    Text("Enter a new name for '\(playlist.name)'")
                 }
             }
-        }
-        .tint(theme.accentColor)
     }
 }
-
 
 struct LibraryListView: View {
     @ObservedObject var audioManager: AudioManager
