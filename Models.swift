@@ -45,9 +45,10 @@ struct Playlist: Identifiable, Codable {
     }
 }
 
-enum LibraryFilter: String, CaseIterable {
-    case songs = "Songs"
-    case playlists = "Playlists"
+enum LibraryFilter: Hashable {
+    case songs
+    case playlists
+    case player
 }
 
 enum LibraryItem: Identifiable {
@@ -86,3 +87,4 @@ enum ArtworkTarget: Identifiable {
         }
     }
 }
+

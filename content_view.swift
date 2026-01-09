@@ -27,6 +27,7 @@ struct ContentView: View {
     @State private var showingBatchDeleteAlert = false
     @State private var showingSongView = true
     @State private var showingSettings = false
+    
 
     var shouldShowEmptyPlaylistView: Bool {
         audioManager.playlists.count == 1 && !showingSongView
@@ -79,12 +80,61 @@ struct ContentView: View {
         ZStack(alignment: .bottom) {
             Color(theme.backgroundColor)
                 .ignoresSafeArea()
-
+            
             VStack(spacing: 0) {
-                contentSection
-
-                if audioManager.currentlyPlayingID != nil && !isMultiSelectMode
-                {
+                TabView(selection: $libraryFilter) {
+                    Group {
+                        if shouldShowEmptyPlaylistView {
+                            EmptyPlaylistView(
+                                showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
+                                newPlaylistName: $newPlaylistName
+                            )
+                        } else {
+                            PlaylistsListView(
+                                audioManager: audioManager,
+                                navigateToPlayer: $navigateToPlayer,
+                                selectedAudioFile: $selectedAudioFile,
+                                showingRenameAlert: $showingRenameAlert,
+                                renamingAudioFile: $renamingAudioFile,
+                                newFileName: $newFileName,
+                                showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
+                                renamingPlaylist: $renamingPlaylist,
+                                newPlaylistNameRename: $newPlaylistNameRename,
+                                artworkTarget: $artworkTarget,
+                                showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
+                                newPlaylistName: $newPlaylistName
+                            )
+                        }
+                    }
+                    .tag(LibraryFilter.playlists)
+                    
+                    Group {
+                        if shouldShowEmptySongsView {
+                            EmptySongStateView(showingFilePicker: $showingFilePicker)
+                        } else {
+                            SongsListView(
+                                audioManager: audioManager,
+                                navigateToPlayer: $navigateToPlayer,
+                                selectedAudioFile: $selectedAudioFile,
+                                showingRenameAlert: $showingRenameAlert,
+                                renamingAudioFile: $renamingAudioFile,
+                                newFileName: $newFileName,
+                                isReorderMode: $isReorderMode,
+                                artworkTarget: $artworkTarget,
+                                isMultiSelectMode: $isMultiSelectMode,
+                                selectedFileIDs: $selectedFileIDs,
+                                showingFilePicker: $showingFilePicker
+                            )
+                        }
+                    }
+                    .tag(LibraryFilter.songs)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .onChange(of: libraryFilter) { oldValue, newValue in
+                    showingSongView = (newValue == .songs)
+                }
+                
+                if audioManager.currentlyPlayingID != nil && !isMultiSelectMode {
                     Divider()
                     MiniPlayerBar(
                         audioManager: audioManager,
@@ -93,44 +143,12 @@ struct ContentView: View {
                     )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-
+                
                 bottomTabBar
             }
         }
     }
 
-    private var contentSection: some View {
-        Group {
-            /*if shouldShowEmptySongsView {
-                EmptySongStateView(showingFilePicker: $showingFilePicker)
-            } else if shouldShowEmptyPlaylistView {
-                EmptyPlaylistView(
-                    showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
-                    newPlaylistName: $newPlaylistName
-                )
-            } else { */
-                LibraryListView(
-                    audioManager: audioManager,
-                    filter: libraryFilter,
-                    navigateToPlayer: $navigateToPlayer,
-                    selectedAudioFile: $selectedAudioFile,
-                    showingRenameAlert: $showingRenameAlert,
-                    renamingAudioFile: $renamingAudioFile,
-                    newFileName: $newFileName,
-                    showingRenamePlaylistAlert: $showingRenamePlaylistAlert,
-                    renamingPlaylist: $renamingPlaylist,
-                    newPlaylistNameRename: $newPlaylistNameRename,
-                    isReorderMode: $isReorderMode,
-                    artworkTarget: $artworkTarget,
-                    isMultiSelectMode: $isMultiSelectMode,
-                    selectedFileIDs: $selectedFileIDs,
-                    showingFilePicker: $showingFilePicker,
-                    showingCreatePlaylistAlert: $showingCreatePlaylistAlert,
-                    newPlaylistName: $newPlaylistName
-                )
-            //}
-        }
-    }
 
     private var bottomTabBar: some View {
         HStack(spacing: 0) {
