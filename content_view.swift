@@ -26,16 +26,15 @@ struct ContentView: View {
     @State private var showingBatchPlaylistMenu = false
     @State private var showingBatchDeleteAlert = false
     @State private var showingSongView = true
+    @State private var showingSettings = false
     
     var shouldShowEmptyPlaylistView: Bool {
-        audioManager.playlists.count == 1 && !showingSongView //check if 1 since master will always take 1 spot
+        audioManager.playlists.count == 1 && !showingSongView
     }
     
     var shouldShowEmptySongsView: Bool {
         audioManager.audioFiles.isEmpty && showingSongView
     }
-    
-
     
     var body: some View {
         NavigationStack {
@@ -44,9 +43,9 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    if shouldShowEmptySongsView{
+                    if shouldShowEmptySongsView {
                         EmptySongStateView()
-                    } else if shouldShowEmptyPlaylistView{
+                    } else if shouldShowEmptyPlaylistView {
                         EmptyPlaylistView()
                     } else {
                         LibraryListView(
@@ -66,115 +65,131 @@ struct ContentView: View {
                             selectedFileIDs: $selectedFileIDs
                         )
                     }
-                }
-                
-                if audioManager.currentlyPlayingID != nil && !isMultiSelectMode {
-                    MiniPlayerBar(
-                        audioManager: audioManager,
-                        navigateToPlayer: $navigateToPlayer,
-                        selectedAudioFile: $selectedAudioFile
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(2)
-                }
-                
-                VStack {
-                    HStack {
-                        Button(action: {
-                            libraryFilter = libraryFilter == .songs ? .playlists : .songs
-                            showingSongView = !showingSongView
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: libraryFilter == .songs ? "music.note" : "music.note.list")
-                                    .font(.title2)
-                                    .foregroundStyle(theme.accentColor)
-                                Text(libraryFilter.rawValue)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(theme.textColor)
+                    
+                    if audioManager.currentlyPlayingID != nil && !isMultiSelectMode {
+                        Divider()
+                        MiniPlayerBar(
+                            audioManager: audioManager,
+                            navigateToPlayer: $navigateToPlayer,
+                            selectedAudioFile: $selectedAudioFile
+                        )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                    
+                    HStack(spacing: 0) {
+                        Button {
+                            libraryFilter = .playlists
+                            showingSongView = false
+                        } label: {
+                            VStack(spacing: 2) {
+                                Image(systemName: "music.note.list")
+                                    .font(.title3)
+                                Text("Playlists")
+                                    .font(.system(size: 10))
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .padding(.leading, 20)
-                        .padding(.top, 10)
-
-                        Spacer()
-                        
-                        if isMultiSelectMode {
-                            Button {
-                                if selectedFileIDs.count == audioManager.displayedSongs.count {
-                                    selectedFileIDs.removeAll()
-                                } else {
-                                    selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
-                                }
-                            } label: {
-                                Text("All")
-                                    .font(.headline)
-                                    .foregroundStyle(theme.textColor)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 12)
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .padding(.trailing, 8)
+                            .foregroundStyle(libraryFilter == .playlists ? theme.accentColor : theme.secondaryTextColor)
+                            .frame(maxWidth: .infinity)
                             .padding(.top, 10)
+                            .padding(.bottom, 0)
                         }
                         
-                        if isReorderMode || isMultiSelectMode {
-                            Button {
-                                if isReorderMode {
-                                    isReorderMode = false
-                                } else {
-                                    isMultiSelectMode = false
-                                    selectedFileIDs.removeAll()
-                                }
-                            } label: {
-                                Text("Done")
-                                    .font(.headline)
-                                    .foregroundStyle(theme.textColor)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 12)
-                                    .background(.red)
-                                    .clipShape(Capsule())
+                        Button {
+                            libraryFilter = .songs
+                            showingSongView = true
+                        } label: {
+                            VStack(spacing: 2) {
+                                Image(systemName: "music.note")
+                                    .font(.title3)
+                                Text("Songs")
+                                    .font(.system(size: 10))
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .padding(.trailing, 20)
+                            .foregroundStyle(libraryFilter == .songs ? theme.accentColor : theme.secondaryTextColor)
+                            .frame(maxWidth: .infinity)
                             .padding(.top, 10)
-                        } else {
-                            Menu {
-                                Button { showingFilePicker = true } label: { Label("Add Songs", systemImage: "music.note.list") }
+                            .padding(.bottom, 0)
+                        }
+                        
+                        Button {
+                            if let currentFile = audioManager.audioFiles.first(where: { $0.id == audioManager.currentlyPlayingID }) {
+                                selectedAudioFile = currentFile
+                                navigateToPlayer = true
+                            }
+                        } label: {
+                            VStack(spacing: 2) {
+                                Image(systemName: "play.circle.fill")
+                                    .font(.title3)
+                                Text("Player")
+                                    .font(.system(size: 10))
+                            }
+                            //.foregroundStyle(navigateToPlayer ? theme.accentColor : theme.secondaryTextColor)
+                            .foregroundStyle(theme.secondaryTextColor)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 10)
+                            .padding(.bottom, 0)
+                        }
+                        .disabled(audioManager.currentlyPlayingID == nil)
+                    }
+                    .frame(height: 45)
+                    .background(.ultraThinMaterial)
+                    .padding(.bottom, 0)
+                    //.padding(.top, 50)
+                    .ignoresSafeArea(edges: .bottom)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if isReorderMode || isMultiSelectMode {
+                        Button {
+                            if isReorderMode {
+                                isReorderMode = false
+                            } else {
+                                isMultiSelectMode = false
+                                selectedFileIDs.removeAll()
+                            }
+                        } label: {
+                            Text("Done")
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(.red)
+                                .clipShape(Capsule())
+                        }
+                    } else {
+                        Menu {
+                            Button { showingFilePicker = true } label: { Label("Add Songs", systemImage: "music.note.list") }
+                            Button {
+                                newPlaylistName = ""
+                                showingCreatePlaylistAlert = true
+                            } label: { Label("Create Playlist", systemImage: "text.badge.plus") }
+                            if libraryFilter == .songs {
                                 Button {
-                                    newPlaylistName = ""
-                                    showingCreatePlaylistAlert = true
-                                } label: { Label("Create Playlist", systemImage: "text.badge.plus") }
-                                if libraryFilter == .songs {
-                                    Button {
-                                        isMultiSelectMode = true
-                                        selectedFileIDs.removeAll()
-                                    } label: { Label("Select Multiple", systemImage: "checkmark.circle") }
-                                    Button { isReorderMode = true } label: { Label("Reorder Songs", systemImage: "arrow.up.arrow.down") }
-                                }
-                            } label: {
-                                ZStack {
-                                    Circle()
-                                        .fill(.ultraThinMaterial)
-                                        .opacity(0.50)
-                                        .frame(width: 60, height: 60)
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 24, weight: .semibold))
-                                        .foregroundStyle(theme.accentColor)
-                                }
+                                    isMultiSelectMode = true
+                                    selectedFileIDs.removeAll()
+                                } label: { Label("Select Multiple", systemImage: "checkmark.circle") }
+                                Button { isReorderMode = true } label: { Label("Reorder Songs", systemImage: "arrow.up.arrow.down") }
                             }
-                            .padding(.trailing, 20)
-                            .padding(.top, 10)
+                            Button { showingSettings = true } label: { Label("Settings", systemImage: "gear") }
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .foregroundStyle(theme.accentColor)
                         }
                     }
-                    Spacer()
+                }
+                
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if isMultiSelectMode {
+                        Button {
+                            if selectedFileIDs.count == audioManager.displayedSongs.count {
+                                selectedFileIDs.removeAll()
+                            } else {
+                                selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
+                            }
+                        } label: {
+                            Text("Select All")
+                                .foregroundStyle(theme.accentColor)
+                        }
+                    }
                 }
             }
             .sheet(isPresented: $showingFilePicker) { DocumentPicker(audioManager: audioManager) }
@@ -198,6 +213,9 @@ struct ContentView: View {
                 if let url = shareURL {
                     ShareSheet(activityItems: [url])
                 }
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
             .confirmationDialog("Add to Playlist", isPresented: $showingBatchPlaylistMenu) {
                 let playlists = audioManager.sortedPlaylists
@@ -269,10 +287,10 @@ struct ContentView: View {
                 }
             }
         }
-        .navigationBarHidden(true)
         .tint(theme.accentColor)
     }
 }
+
 
 struct LibraryListView: View {
     @ObservedObject var audioManager: AudioManager
@@ -344,7 +362,7 @@ struct SongsListView: View {
 
     var body: some View {
         List {
-            Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            //Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
 
             ForEach(sortedSongs, id: \.id) { audioFile in
                 AudioFileButton(
@@ -389,7 +407,7 @@ struct SongsListView: View {
                 }
             }
             
-            Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            //Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -452,7 +470,7 @@ struct PlaylistsListView: View {
     
     var body: some View {
         List {
-            Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            //Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
             
             ForEach(audioManager.sortedPlaylists) { playlist in
                 NavigationLink(destination: PlaylistDetailView(
@@ -486,11 +504,11 @@ struct PlaylistsListView: View {
                     Button(role: .destructive) { audioManager.deletePlaylist(playlist) } label: { Label("Delete", systemImage: "trash") }
                 }
             }
-            Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            //Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .background(Color(theme.backgroundColor))
     }
 }
 
@@ -509,7 +527,6 @@ struct MiniPlayerBar: View {
         if let audioFile = currentAudioFile {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-
                     Button {
                         selectedAudioFile = audioFile
                         navigateToPlayer = true
@@ -530,24 +547,6 @@ struct MiniPlayerBar: View {
                                     .font(.caption)
                                     .foregroundStyle(theme.secondaryTextColor)
                             }
-
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    Rectangle()
-                                        .fill(theme.backgroundColor.opacity(0.3))
-                                        .frame(height: 3)
-
-                                    Rectangle()
-                                        .fill(theme.accentColor)
-                                        .frame(
-                                            width: geometry.size.width * progressPercentage,
-                                            height: 3
-                                        )
-                                }
-                            }
-                            .frame(height: 3)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
                         }
                         .contentShape(Rectangle())
                     }
@@ -558,7 +557,7 @@ struct MiniPlayerBar: View {
                     HStack(spacing: 20) {
                         Button(action: { audioManager.skipPreviousSong() }) {
                             Image(systemName: "backward.fill")
-                                .font(.title)
+                                .font(.title2)
                                 .foregroundStyle(theme.secondaryTextColor)
                         }
                         .buttonStyle(.plain)
@@ -574,23 +573,34 @@ struct MiniPlayerBar: View {
 
                         Button(action: { audioManager.skipNextSong() }) {
                             Image(systemName: "forward.fill")
-                                .font(.title)
+                                .font(.title2)
                                 .foregroundStyle(theme.secondaryTextColor)
                         }
                         .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+                .padding(.vertical, 8)
+                
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(theme.backgroundColor.opacity(0.3))
+                            .frame(height: 3)
+
+                        Rectangle()
+                            .fill(theme.accentColor)
+                            .frame(
+                                width: geometry.size.width * progressPercentage,
+                                height: 3
+                            )
+                    }
+                }
+                .frame(height: 3)
             }
             .background(.ultraThinMaterial)
-            .cornerRadius(16)
-            .padding(.bottom, 8)
-            .padding(.horizontal, 4)
         }
     }
-    
     
     private var progressPercentage: CGFloat {
         guard audioManager.duration > 0 else { return 0 }
@@ -602,7 +612,6 @@ struct MiniPlayerBar: View {
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
-
 }
 
 struct PlaylistRowView: View {
