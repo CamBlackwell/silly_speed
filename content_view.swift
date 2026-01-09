@@ -531,6 +531,9 @@ struct SongsListView: View {
             }
             .listRowBackground(Color(theme.backgroundColor))
             .listRowSeparator(.hidden)
+            .padding(.bottom, 0)
+            
+            
 
             ForEach(sortedSongs, id: \.id) { audioFile in
                 AudioFileButton(
@@ -659,6 +662,7 @@ struct PlaylistsListView: View {
             }
             .listRowBackground(Color(theme.backgroundColor))
             .listRowSeparator(.hidden)
+            .padding(.bottom, 0)
 
             ForEach(audioManager.sortedPlaylists) { playlist in
                 NavigationLink(
@@ -890,6 +894,7 @@ struct EmptySongStateView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 4)
             .padding(.leading, 5)
+            .multilineTextAlignment(.center)
 
             Spacer()
 
@@ -1104,19 +1109,26 @@ struct AddActionButton: View {
     @EnvironmentObject var theme: ThemeManager
     let title: String
     let action: () -> Void
-
+    
     var body: some View {
         Button(action: action) {
-            HStack {
-                Image(systemName: "plus.circle.fill")
+            HStack(alignment: .center) {
+                /*Image(systemName: "plus.square.fill")
                     .font(.title2)
                     .foregroundStyle(theme.accentColor)
+                    .frame(width: 35, height: 35)
+                    .padding(.leading, 8)
+                 */
+                Spacer()
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(theme.accentColor)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .contentShape(Rectangle())
+                
                 Spacer()
             }
-            .padding(.vertical, 8)
         }
     }
 }
@@ -1261,7 +1273,7 @@ struct AudioFileContextMenu: View {
         Button(role: .destructive) {
             audioManager.deleteAudioFile(audioFile)
         } label: {
-            Label("Delete via Menu", systemImage: "trash")
+            Label("Delete", systemImage: "trash")
         }
     }
 }
