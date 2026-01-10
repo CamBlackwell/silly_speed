@@ -49,13 +49,14 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
     }
         
     func load(audioFile: AudioFile){
+        let url = audioFile.fileURL
+        
         do {
-            self.audioFile = try AVAudioFile(forReading: audioFile.fileURL)
+            self.audioFile = try AVAudioFile(forReading: url)
             seekOffset = 0
         } catch {
-            print("failed to load audioFile: \(error)")
+            print("failed to load audioFile: \(error) at \(url.path())")
         }
-        
     }
     
     func play() {

@@ -1122,17 +1122,13 @@ struct MultiSelectContextMenu: View {
         var tempURLs: [URL] = []
 
         for fileID in selectedFileIDs {
-            guard
-                let file = audioManager.audioFiles.first(where: {
-                    $0.id == fileID
-                })
-            else { continue }
+            guard let file = audioManager.audioFiles.first(where: { $0.id == fileID }) else { continue }
 
-            let tempURL = tempDir.appendingPathComponent(
-                file.fileURL.lastPathComponent
-            )
+            let fileURL = file.fileURL
+            let tempURL = tempDir.appendingPathComponent(fileURL.lastPathComponent)
+            
             do {
-                try FileManager.default.copyItem(at: file.fileURL, to: tempURL)
+                try FileManager.default.copyItem(at: fileURL, to: tempURL)
                 tempURLs.append(tempURL)
             } catch {
                 print("Error copying file for sharing: \(error)")

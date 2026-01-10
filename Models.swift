@@ -3,25 +3,28 @@ import Foundation
 struct AudioFile: Identifiable, Codable {
     let id: UUID
     let fileName: String
-    let fileURL: URL
     let dateAdded: Date
     let audioDuration: Float
     var artworkImageName: String?
     var title: String
     
-    init(fileName: String, fileURL: URL, audioDuration: Float, artworkImageName: String? = nil) {
+    var fileURL: URL {
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsDirectory.appendingPathComponent(fileName)
+    }
+    
+    init(fileName: String, audioDuration: Float, artworkImageName: String? = nil) {
         self.id = UUID()
         self.fileName = fileName
-        self.fileURL = fileURL
         self.dateAdded = Date()
         self.audioDuration = audioDuration
         self.artworkImageName = artworkImageName
-        self.title = (fileName as NSString).deletingPathExtension     }
+        self.title = (fileName as NSString).deletingPathExtension
+    }
     
-    init(id: UUID, fileName: String, fileURL: URL, dateAdded: Date, audioDuration: Float, artworkImageName: String? = nil, title: String? = nil) {
+    init(id: UUID, fileName: String, dateAdded: Date, audioDuration: Float, artworkImageName: String? = nil, title: String? = nil) {
         self.id = id
         self.fileName = fileName
-        self.fileURL = fileURL
         self.dateAdded = dateAdded
         self.audioDuration = audioDuration
         self.artworkImageName = artworkImageName

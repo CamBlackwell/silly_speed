@@ -419,19 +419,26 @@ class AudioManager: NSObject, ObservableObject {
         
         Task {
             do {
+                print("Importing from: \(url)")
+                
                 guard url.startAccessingSecurityScopedResource() else {
                     throw NSError(domain: "AudioImport", code: 1, userInfo: [NSLocalizedDescriptionKey: "No permission to access this file"])
                 }
                 
-                defer { url.stopAccessingSecurityScopedResource() }
+                defer {
+                    url.stopAccessingSecurityScopedResource()
+                    print("Released security scope")
+                }
                 
                 let originalFileName = url.lastPathComponent
                 let uniqueFileName = generateUniqueFileName(for: originalFileName)
                 let destinationURL = fileDirectory.appendingPathComponent(uniqueFileName)
                 
+                print("Copying to: \(destinationURL)")
+                
                 let fileCoordinator = NSFileCoordinator()
                 
-                let downloadedURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+                let coordinatedURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
                     var coordinationError: NSError?
                     
                     fileCoordinator.coordinate(readingItemAt: url, options: [.withoutChanges], error: &coordinationError) { coordinatedURL in
@@ -443,7 +450,8 @@ class AudioManager: NSObject, ObservableObject {
                     }
                 }
                 
-                try FileManager.default.copyItem(at: downloadedURL, to: destinationURL)
+                try FileManager.default.copyItem(at: coordinatedURL, to: destinationURL)
+                print("File copied successfully")
                 
                 let asset = AVURLAsset(url: destinationURL, options: nil)
                 let duration = try await asset.load(.duration)
@@ -454,7 +462,7 @@ class AudioManager: NSObject, ObservableObject {
                     throw NSError(domain: "AudioImport", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid or corrupted audio file"])
                 }
                 
-                let audioFile = AudioFile(fileName: uniqueFileName, fileURL: destinationURL, audioDuration: durationInSeconds)
+                let audioFile = AudioFile(fileName: uniqueFileName, audioDuration: durationInSeconds)
                 
                 await MainActor.run {
                     audioFiles.append(audioFile)
@@ -471,12 +479,15 @@ class AudioManager: NSObject, ObservableObject {
                         playbackQueue = sortedAudioFiles
                     }
                     
+                    print("Import complete: \(uniqueFileName)")
                     isImporting = false
                 }
                 
             } catch {
                 await MainActor.run {
                     isImporting = false
+                    
+                    print("Import error: \(error)")
                     
                     let nsError = error as NSError
                     if nsError.domain == NSCocoaErrorDomain {
@@ -525,7 +536,7 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     private func cleanupOrphanedFiles() {
-        let trackedURLs = Set(audioFiles.map { $0.fileURL.lastPathComponent })
+        let trackedFileNames = Set(audioFiles.map { $0.fileName })
         
         guard let files = try? FileManager.default.contentsOfDirectory(at: fileDirectory, includingPropertiesForKeys: nil) else {
             return
@@ -533,7 +544,8 @@ class AudioManager: NSObject, ObservableObject {
         
         for fileURL in files {
             let fileName = fileURL.lastPathComponent
-            if fileName != "Artwork" && !trackedURLs.contains(fileName) {
+            if fileName != "Artwork" && !trackedFileNames.contains(fileName) {
+                print("Deleting orphaned file: \(fileName)")
                 try? FileManager.default.removeItem(at: fileURL)
             }
         }
@@ -543,11 +555,14 @@ class AudioManager: NSObject, ObservableObject {
         if currentlyPlayingID == audioFile.id {
             stop()
         }
+        
+        let url = audioFile.fileURL
         do {
-            try FileManager.default.removeItem(at: audioFile.fileURL)
+            try FileManager.default.removeItem(at: url)
         } catch {
             print("failed to delete file \(error.localizedDescription)")
         }
+        
         audioFiles.removeAll{$0.id == audioFile.id}
         deleteArtworkIfUnused(audioFile.artworkImageName)
         saveAudioFiles()
@@ -577,21 +592,35 @@ class AudioManager: NSObject, ObservableObject {
         
         do {
             let loadedFiles = try JSONDecoder().decode([AudioFile].self, from: data)
-            audioFiles = loadedFiles.filter{FileManager.default.fileExists(atPath: $0.fileURL.path())}
+            audioFiles = loadedFiles.filter { file in
+                let url = file.fileURL
+                let exists = FileManager.default.fileExists(atPath: url.path())
+                if !exists {
+                    print("File missing: \(file.fileName) at \(url.path())")
+                }
+                return exists
+            }
+            print("Loaded \(audioFiles.count) audio files")
         } catch {
             print("failed to load Audio Files \(error.localizedDescription)")
         }
     }
     
     func renameAudioFile(_ audioFile: AudioFile, to newTitle: String) {
-        if let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) {
-            var updatedFile = audioFiles[index]
-            updatedFile.title = newTitle
-            audioFiles[index] = updatedFile
-            saveAudioFiles()
-            
-            displayedSongs = sortedAudioFiles
-        }
+        guard let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) else { return }
+        
+        let updatedFile = AudioFile(
+            id: audioFile.id,
+            fileName: audioFile.fileName,
+            dateAdded: audioFile.dateAdded,
+            audioDuration: audioFile.audioDuration,
+            artworkImageName: audioFile.artworkImageName,
+            title: newTitle
+        )
+        
+        audioFiles[index] = updatedFile
+        saveAudioFiles()
+        displayedSongs = sortedAudioFiles
     }
     
     func urlForSharing(_ audioFile: AudioFile) -> URL? {
@@ -684,13 +713,11 @@ class AudioManager: NSObject, ObservableObject {
         guard let index = audioFiles.firstIndex(where: { $0.id == audioFile.id }) else { return }
         
         let oldArtwork = audioFiles[index].artworkImageName
-        
         guard let newFilename = saveArtwork(from: image) else { return }
         
         let updatedFile = AudioFile(
             id: audioFile.id,
             fileName: audioFile.fileName,
-            fileURL: audioFile.fileURL,
             dateAdded: audioFile.dateAdded,
             audioDuration: audioFile.audioDuration,
             artworkImageName: newFilename,
@@ -700,7 +727,6 @@ class AudioManager: NSObject, ObservableObject {
         audioFiles[index] = updatedFile
         displayedSongs = sortedAudioFiles
         saveAudioFiles()
-        
         deleteArtworkIfUnused(oldArtwork)
     }
     
@@ -725,7 +751,6 @@ class AudioManager: NSObject, ObservableObject {
         let updatedFile = AudioFile(
             id: audioFile.id,
             fileName: audioFile.fileName,
-            fileURL: audioFile.fileURL,
             dateAdded: audioFile.dateAdded,
             audioDuration: audioFile.audioDuration,
             artworkImageName: nil,
@@ -734,10 +759,8 @@ class AudioManager: NSObject, ObservableObject {
         
         audioFiles[index] = updatedFile
         saveAudioFiles()
-        
         deleteArtworkIfUnused(oldArtwork)
     }
-    
     func removeArtwork(from playlist: Playlist) {
         guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else { return }
         
