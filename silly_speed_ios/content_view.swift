@@ -5,37 +5,26 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @EnvironmentObject var audioManager: AudioManager
     @EnvironmentObject var theme: ThemeManager
-
     @State private var showingFilePicker = false
     @State private var navigateToPlayer = false
     @State private var selectedAudioFile: AudioFile?
-
     @State private var libraryFilter: LibraryFilter = .songs
-
     @State private var showingCreatePlaylistAlert = false
     @State private var newPlaylistName = ""
-
     @State private var showingRenameAlert = false
     @State private var renamingAudioFile: AudioFile?
     @State private var newFileName = ""
-
     @State private var showingRenamePlaylistAlert = false
     @State private var renamingPlaylist: Playlist?
     @State private var newPlaylistNameRename = ""
-
     @State private var isReorderMode = false
-
     @State private var showingShareSheet = false
     @State private var shareURL: URL?
-
     @State private var artworkTarget: ArtworkTarget?
-
     @State private var isMultiSelectMode = false
     @State private var selectedFileIDs: Set<UUID> = []
-
     @State private var showingBatchPlaylistMenu = false
     @State private var showingBatchDeleteAlert = false
-
     @State private var showingSettings = false
 
     
@@ -183,81 +172,95 @@ struct ContentView: View {
     }
     
     private var leadingToolbarButton: some View {
-        Group {
-            if !isReorderMode && !isMultiSelectMode {
-                Button {
-                    isMultiSelectMode = true
-                    selectedFileIDs.removeAll()
-                } label: {
-                    Image(systemName: "checkmark.circle")
-                        .font(.title2)
-                        .foregroundStyle(theme.accentColor)
-                }
-            } else if isMultiSelectMode {
-                Button {
-                    if selectedFileIDs.count == audioManager.displayedSongs.count {
-                        selectedFileIDs.removeAll()
-                    } else {
-                        selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
-                    }
-                } label: {
-                    Text("Select All")
-                        .foregroundStyle(theme.accentColor)
-                }
-            }
-        }
-    }
-    
-    private var trailingToolbarButton: some View {
-        Group {
-            if isReorderMode || isMultiSelectMode {
-                Button {
-                    if isReorderMode {
-                        isReorderMode = false
-                    } else {
-                        isMultiSelectMode = false
-                        selectedFileIDs.removeAll()
-                    }
-                } label: {
-                    Text("Done")
-                        .foregroundStyle(theme.accentColor)
-                }
-            } else {
-                Menu {
+            Group {
+                if libraryFilter == .player {
                     Button {
-                        showingFilePicker = true
+                        withAnimation {
+                            libraryFilter = .songs
+                        }
                     } label: {
-                        Label("Add Songs", systemImage: "music.note.list")
+                        Image(systemName: "chevron.backward")
+                            .font(.title2)
+                            .foregroundStyle(theme.accentColor)
                     }
-
-                    Button {
-                        newPlaylistName = ""
-                        showingCreatePlaylistAlert = true
-                    } label: {
-                        Label("Create Playlist", systemImage: "text.badge.plus")
-                    }
-
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Label("Settings", systemImage: "gear")
-                    }
-
-                    if libraryFilter == .songs {
+                } else {
+                    if !isReorderMode && !isMultiSelectMode {
                         Button {
-                            isReorderMode = true
+                            isMultiSelectMode = true
+                            selectedFileIDs.removeAll()
                         } label: {
-                            Label("Reorder Songs", systemImage: "arrow.up.arrow.down")
+                            Image(systemName: "checkmark.circle")
+                                .font(.title2)
+                                .foregroundStyle(theme.accentColor)
+                        }
+                    } else if isMultiSelectMode {
+                        Button {
+                            if selectedFileIDs.count == audioManager.displayedSongs.count {
+                                selectedFileIDs.removeAll()
+                            } else {
+                                selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
+                            }
+                        } label: {
+                            Text("Select All")
+                                .foregroundStyle(theme.accentColor)
                         }
                     }
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.title2)
-                        .foregroundStyle(theme.accentColor)
                 }
             }
         }
-    }
+    
+    private var trailingToolbarButton: some View {
+            Group {
+                if libraryFilter != .player {
+                    if isReorderMode || isMultiSelectMode {
+                        Button {
+                            if isReorderMode {
+                                isReorderMode = false
+                            } else {
+                                isMultiSelectMode = false
+                                selectedFileIDs.removeAll()
+                            }
+                        } label: {
+                            Text("Done")
+                                .foregroundStyle(theme.accentColor)
+                        }
+                    } else {
+                        Menu {
+                            Button {
+                                showingFilePicker = true
+                            } label: {
+                                Label("Add Songs", systemImage: "music.note.list")
+                            }
+                            
+                            Button {
+                                newPlaylistName = ""
+                                showingCreatePlaylistAlert = true
+                            } label: {
+                                Label("Create Playlist", systemImage: "text.badge.plus")
+                            }
+                            
+                            Button {
+                                showingSettings = true
+                            } label: {
+                                Label("Settings", systemImage: "gear")
+                            }
+                            
+                            if libraryFilter == .songs {
+                                Button {
+                                    isReorderMode = true
+                                } label: {
+                                    Label("Reorder Songs", systemImage: "arrow.up.arrow.down")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .foregroundStyle(theme.accentColor)
+                        }
+                    }
+                }
+            }
+        }
 
 
     private var bottomTabBar: some View {
