@@ -72,7 +72,12 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     override init() {
-        self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.appGroupIdentifier) {
+            self.fileDirectory = groupURL.appendingPathComponent("AudioFiles", isDirectory: true)
+            try? FileManager.default.createDirectory(at: self.fileDirectory, withIntermediateDirectories: true)
+        } else {
+            self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        }
         self.artworkDirectory = fileDirectory.appendingPathComponent("Artwork", isDirectory: true)
         super.init()
         try? FileManager.default.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
@@ -117,6 +122,8 @@ class AudioManager: NSObject, ObservableObject {
             }
         }
         observerTokens.append(fgToken)
+        
+        processPendingImports()
     }
     
     deinit {
@@ -438,11 +445,16 @@ class AudioManager: NSObject, ObservableObject {
                 
                 let fileCoordinator = NSFileCoordinator()
                 
-                let coordinatedURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     var coordinationError: NSError?
                     
                     fileCoordinator.coordinate(readingItemAt: url, options: [.withoutChanges], error: &coordinationError) { coordinatedURL in
-                        continuation.resume(returning: coordinatedURL)
+                        do {
+                            try FileManager.default.copyItem(at: coordinatedURL, to: destinationURL)
+                            continuation.resume(returning: ())
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
                     }
                     
                     if let error = coordinationError {
@@ -450,7 +462,6 @@ class AudioManager: NSObject, ObservableObject {
                     }
                 }
                 
-                try FileManager.default.copyItem(at: coordinatedURL, to: destinationURL)
                 print("File copied successfully")
                 
                 let asset = AVURLAsset(url: destinationURL, options: nil)
@@ -508,7 +519,6 @@ class AudioManager: NSObject, ObservableObject {
             }
         }
     }
-    
     private func generateUniqueFileName(for originalName: String) -> String {
         let baseURL = fileDirectory.appendingPathComponent(originalName)
         
@@ -604,6 +614,68 @@ class AudioManager: NSObject, ObservableObject {
         } catch {
             print("failed to load Audio Files \(error.localizedDescription)")
         }
+    }
+    
+    func processPendingImports(shouldAutoPlay: Bool = false) {
+        guard let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.appGroupIdentifier),
+              let groupDefaults = UserDefaults(suiteName: SharedConstants.appGroupIdentifier),
+              let pendingFiles = groupDefaults.stringArray(forKey: SharedConstants.pendingFilesKey),
+              !pendingFiles.isEmpty else {
+            return
+        }
+        
+        let pendingDirectory = groupURL.appendingPathComponent("PendingImports", isDirectory: true)
+        var importedFiles: [AudioFile] = []
+        
+        for fileName in pendingFiles {
+            let sourceURL = pendingDirectory.appendingPathComponent(fileName)
+            
+            guard FileManager.default.fileExists(atPath: sourceURL.path) else { continue }
+            
+            let uniqueFileName = generateUniqueFileName(for: fileName)
+            let destinationURL = fileDirectory.appendingPathComponent(uniqueFileName)
+            
+            do {
+                try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
+                
+                let asset = AVURLAsset(url: destinationURL)
+                let duration = asset.duration
+                let durationInSeconds = Float(CMTimeGetSeconds(duration))
+
+                guard durationInSeconds > 0 && !durationInSeconds.isNaN && !durationInSeconds.isInfinite else {
+                    try? FileManager.default.removeItem(at: destinationURL)
+                    continue
+                }
+                let audioFile = AudioFile(fileName: uniqueFileName, audioDuration: durationInSeconds)
+                audioFiles.append(audioFile)
+                importedFiles.append(audioFile)
+                
+                if let masterID = masterPlaylistID,
+                   let index = playlists.firstIndex(where: { $0.id == masterID }) {
+                    playlists[index].audioFileIDs.append(audioFile.id)
+                }
+                
+                print("Imported from share: \(uniqueFileName)")
+            } catch {
+                print("Error importing \(fileName): \(error)")
+            }
+        }
+        
+        if !importedFiles.isEmpty {
+            saveAudioFiles()
+            savePlaylists()
+            displayedSongs = sortedAudioFiles
+            playbackQueue = sortedAudioFiles
+            
+            if shouldAutoPlay, let firstFile = importedFiles.first {
+                play(audioFile: firstFile, context: sortedAudioFiles, fromSongsTab: true)
+            }
+        }
+        
+        groupDefaults.removeObject(forKey: SharedConstants.pendingFilesKey)
+        groupDefaults.synchronize()
+        
+        try? FileManager.default.removeItem(at: pendingDirectory)
     }
     
     func renameAudioFile(_ audioFile: AudioFile, to newTitle: String) {

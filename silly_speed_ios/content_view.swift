@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @StateObject private var audioManager = AudioManager()
+    @EnvironmentObject var audioManager: AudioManager
     @EnvironmentObject var theme: ThemeManager
 
     @State private var showingFilePicker = false
