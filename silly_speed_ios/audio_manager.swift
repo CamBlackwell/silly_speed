@@ -969,15 +969,19 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     private func startTimer(){
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        var lastSecond = -1
+        timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             guard let self = self, let engine = self.currentEngine else { return }
             
             if self.isSeeking { return }
             
             let engineTime = engine.currentTime
+            let currentSecond = Int(engineTime)
             
-            DispatchQueue.main.async {
-                self.currentTime = engineTime
+            self.currentTime = engineTime
+            
+            if currentSecond != lastSecond {
+                lastSecond = currentSecond
                 self.updateNowPlayingInfo()
             }
             
