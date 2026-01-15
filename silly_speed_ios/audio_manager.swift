@@ -740,7 +740,6 @@ class AudioManager: NSObject, ObservableObject {
     func getAudioFiles(for playlist: Playlist) -> [AudioFile] {
         return playlist.audioFileIDs
             .compactMap { id in audioFiles.first { $0.id == id } }
-            .sorted { $0.dateAdded > $1.dateAdded }
     }
     
     private func savePlaylists() {

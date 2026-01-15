@@ -78,10 +78,7 @@ struct PlaylistDetailView: View {
                             }
                         }
                         .onMove { source, destination in
-                            var songs = playlistSongs
-                            songs.move(fromOffsets: source, toOffset: destination)
-                            let reorderedIDs = songs.map { $0.id }
-                            audioManager.updatePlaylistOrder(playlist, with: reorderedIDs)
+                            audioManager.reorderPlaylistSongs(in: playlist, from: source, to: destination)
                         }
                         .listRowBackground(Color(theme.backgroundColor))
                         .listRowSeparator(.hidden)
