@@ -1202,7 +1202,7 @@ struct AudioFileRow: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(
-                                isCurrentlyPlaying ? Color.red : Color.clear,
+                                isCurrentlyPlaying ? theme.accentColor : Color.clear,
                                 lineWidth: 2
                             )
                     )
