@@ -1,5 +1,4 @@
 import UIKit
-import Social
 import UniformTypeIdentifiers
 
 class ShareViewController: UIViewController {
@@ -8,6 +7,8 @@ class ShareViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        preferredContentSize = CGSize(width: 100, height: 160)
         
         view.backgroundColor = .systemBackground
         
@@ -23,21 +24,23 @@ class ShareViewController: UIViewController {
         titleLabel.textAlignment = .center
         
         let addButton = UIButton(type: .system)
-        addButton.setTitle("Add to Library", for: .normal)
-        addButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
-        addButton.backgroundColor = .systemBlue
-        addButton.setTitleColor(.white, for: .normal)
-        addButton.layer.cornerRadius = 12
-        addButton.contentEdgeInsets = UIEdgeInsets(top: 16, left: 32, bottom: 16, right: 32)
+        var addConfig = UIButton.Configuration.filled()
+        addConfig.title = "Add to Library"
+        addConfig.baseBackgroundColor = .systemBlue
+        addConfig.baseForegroundColor = .white
+        addConfig.cornerStyle = .medium
+        addConfig.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 32, bottom: 16, trailing: 32)
+        addButton.configuration = addConfig
         addButton.addTarget(self, action: #selector(addToLibrary), for: .touchUpInside)
         
         let addAndPlayButton = UIButton(type: .system)
-        addAndPlayButton.setTitle("Add and Play", for: .normal)
-        addAndPlayButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
-        addAndPlayButton.backgroundColor = .systemGreen
-        addAndPlayButton.setTitleColor(.white, for: .normal)
-        addAndPlayButton.layer.cornerRadius = 12
-        addAndPlayButton.contentEdgeInsets = UIEdgeInsets(top: 16, left: 32, bottom: 16, right: 32)
+        var addAndPlayConfig = UIButton.Configuration.filled()
+        addAndPlayConfig.title = "Add and Play"
+        addAndPlayConfig.baseBackgroundColor = .systemGreen
+        addAndPlayConfig.baseForegroundColor = .white
+        addAndPlayConfig.cornerStyle = .medium
+        addAndPlayConfig.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 32, bottom: 16, trailing: 32)
+        addAndPlayButton.configuration = addAndPlayConfig
         addAndPlayButton.addTarget(self, action: #selector(addAndPlay), for: .touchUpInside)
         
         let cancelButton = UIButton(type: .system)
@@ -153,7 +156,8 @@ class ShareViewController: UIViewController {
         }
         
         if let groupDefaults = UserDefaults(suiteName: appGroupIdentifier) {
-            groupDefaults.set(savedURLs, forKey: SharedConstants.pendingFilesKey)
+            let existing = groupDefaults.stringArray(forKey: SharedConstants.pendingFilesKey) ?? []
+            groupDefaults.set(existing + savedURLs, forKey: SharedConstants.pendingFilesKey)
             groupDefaults.synchronize()
         }
     }
@@ -164,7 +168,7 @@ class ShareViewController: UIViewController {
         var responder: UIResponder? = self
         while responder != nil {
             if let application = responder as? UIApplication {
-                application.open(url, options: [:]) { [weak self] success in
+                application.open(url, options: [:]) { [weak self] _ in
                     self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
                 }
                 return

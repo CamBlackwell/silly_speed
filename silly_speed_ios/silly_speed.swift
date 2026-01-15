@@ -6,7 +6,8 @@ import SwiftUI
 struct SillySpeed: App {
     @StateObject private var themeManager = ThemeManager()
     @StateObject private var audioManager = AudioManager()
-    
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -19,6 +20,14 @@ struct SillySpeed: App {
                         }
                     }
                 }
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        Task {
+                            await audioManager.processPendingImports()
+                        }
+                    }
+                }
         }
     }
 }
+

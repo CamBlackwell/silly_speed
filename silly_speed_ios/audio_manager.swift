@@ -83,12 +83,21 @@ class AudioManager: NSObject, ObservableObject {
     override init() {
         self.artworkDirectory = AudioManager.fileDirectory.appendingPathComponent("Artwork", isDirectory: true)
         super.init()
+
         try? FileManager.default.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
+
         loadAudioFiles()
-        cleanupOrphanedFiles()
         loadOrCreateMasterPlaylist()
         loadPlaylists()
+
+        Task { [weak self] in
+            await self?.processPendingImports()
+            self?.cleanupOrphanedFiles()
+        }
+
         self.displayedSongs = self.sortedAudioFiles
+        self.playbackQueue = self.sortedAudioFiles
+
         loadSelectedAlgorithm()
         loadVisualisationMode()
         setupAudioSession()
@@ -96,40 +105,39 @@ class AudioManager: NSObject, ObservableObject {
         setupInterruptionObserver()
         setupRouteChangeObserver()
         setupConfigurationChangeObserver()
-        
-        self.playbackQueue = self.sortedAudioFiles
-        
+
         let bgToken = NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             guard let self = self else { return }
-            
+
             if !self.isPlaying {
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
             self.updateNowPlayingInfo()
         }
         observerTokens.append(bgToken)
-        
+
         let fgToken = NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             guard let self = self else { return }
-            
+
             if self.currentlyPlayingID != nil {
                 try? AVAudioSession.sharedInstance().setActive(true)
             }
         }
         observerTokens.append(fgToken)
         
-        Task { [weak self] in
-            await self?.processPendingImports()
-        }
+        print(FileManager.default.containerURL(
+               forSecurityApplicationGroupIdentifier: SharedConstants.appGroupIdentifier
+        ) ?? "Failed to access AppGroup")
     }
+
     
     deinit {
         timer?.invalidate()
