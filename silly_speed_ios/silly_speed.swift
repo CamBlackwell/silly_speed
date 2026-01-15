@@ -14,7 +14,9 @@ struct SillySpeed: App {
                 .environmentObject(audioManager)
                 .onOpenURL { url in
                     if url.scheme == "punches" && url.host == "openAndPlay" {
-                        audioManager.processPendingImports(shouldAutoPlay: true)
+                        Task {
+                            await audioManager.processPendingImports(shouldAutoPlay: true)
+                        }
                     }
                 }
         }

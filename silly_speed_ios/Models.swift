@@ -9,8 +9,7 @@ struct AudioFile: Identifiable, Codable {
     var title: String
     
     var fileURL: URL {
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return documentsDirectory.appendingPathComponent(fileName)
+        AudioManager.fileDirectory.appendingPathComponent(fileName)
     }
     
     init(fileName: String, audioDuration: Float, artworkImageName: String? = nil) {

@@ -41,7 +41,6 @@ class AudioManager: NSObject, ObservableObject {
     
     private var currentEngine: AudioEngineProtocol?
     private var timer: Timer?
-    private let fileDirectory: URL
     private let artworkDirectory: URL
     private let audioFilesKey = "savedAudioFiles"
     private let playlistsKey = "savedPlaylists"
@@ -53,6 +52,16 @@ class AudioManager: NSObject, ObservableObject {
     
     private var playbackQueue: [AudioFile] = []
     private var observerTokens: [Any] = []
+    
+    static let fileDirectory: URL = {
+        if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.appGroupIdentifier){
+            let dir = groupURL.appendingPathComponent("AudioFiles", isDirectory: true)
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            return dir
+        } else {
+            return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask) [0]
+        }
+    } ()
     
     var sortedAudioFiles: [AudioFile] {
         guard let masterID = masterPlaylistID,
@@ -72,13 +81,7 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     override init() {
-        if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.appGroupIdentifier) {
-            self.fileDirectory = groupURL.appendingPathComponent("AudioFiles", isDirectory: true)
-            try? FileManager.default.createDirectory(at: self.fileDirectory, withIntermediateDirectories: true)
-        } else {
-            self.fileDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        }
-        self.artworkDirectory = fileDirectory.appendingPathComponent("Artwork", isDirectory: true)
+        self.artworkDirectory = AudioManager.fileDirectory.appendingPathComponent("Artwork", isDirectory: true)
         super.init()
         try? FileManager.default.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
         loadAudioFiles()
@@ -123,7 +126,9 @@ class AudioManager: NSObject, ObservableObject {
         }
         observerTokens.append(fgToken)
         
-        processPendingImports()
+        Task { [weak self] in
+            await self?.processPendingImports()
+        }
     }
     
     deinit {
@@ -439,7 +444,7 @@ class AudioManager: NSObject, ObservableObject {
                 
                 let originalFileName = url.lastPathComponent
                 let uniqueFileName = generateUniqueFileName(for: originalFileName)
-                let destinationURL = fileDirectory.appendingPathComponent(uniqueFileName)
+                let destinationURL = AudioManager.fileDirectory.appendingPathComponent(uniqueFileName)
                 
                 print("Copying to: \(destinationURL)")
                 
@@ -520,7 +525,7 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     private func generateUniqueFileName(for originalName: String) -> String {
-        let baseURL = fileDirectory.appendingPathComponent(originalName)
+        let baseURL = AudioManager.fileDirectory.appendingPathComponent(originalName)
         
         if !FileManager.default.fileExists(atPath: baseURL.path()) {
             return originalName
@@ -535,7 +540,7 @@ class AudioManager: NSObject, ObservableObject {
             ? "\(nameWithoutExtension) \(counter)"
             : "\(nameWithoutExtension) \(counter).\(fileExtension)"
             
-            let newURL = fileDirectory.appendingPathComponent(newName)
+            let newURL = AudioManager.fileDirectory.appendingPathComponent(newName)
             
             if !FileManager.default.fileExists(atPath: newURL.path()) {
                 return newName
@@ -548,7 +553,7 @@ class AudioManager: NSObject, ObservableObject {
     private func cleanupOrphanedFiles() {
         let trackedFileNames = Set(audioFiles.map { $0.fileName })
         
-        guard let files = try? FileManager.default.contentsOfDirectory(at: fileDirectory, includingPropertiesForKeys: nil) else {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: AudioManager.fileDirectory, includingPropertiesForKeys: nil) else {
             return
         }
         
@@ -616,7 +621,7 @@ class AudioManager: NSObject, ObservableObject {
         }
     }
     
-    func processPendingImports(shouldAutoPlay: Bool = false) {
+    func processPendingImports(shouldAutoPlay: Bool = false) async {
         guard let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.appGroupIdentifier),
               let groupDefaults = UserDefaults(suiteName: SharedConstants.appGroupIdentifier),
               let pendingFiles = groupDefaults.stringArray(forKey: SharedConstants.pendingFilesKey),
@@ -633,13 +638,14 @@ class AudioManager: NSObject, ObservableObject {
             guard FileManager.default.fileExists(atPath: sourceURL.path) else { continue }
             
             let uniqueFileName = generateUniqueFileName(for: fileName)
-            let destinationURL = fileDirectory.appendingPathComponent(uniqueFileName)
+            let destinationURL = AudioManager.fileDirectory.appendingPathComponent(uniqueFileName)
             
             do {
                 try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
                 
                 let asset = AVURLAsset(url: destinationURL)
-                let duration = asset.duration
+                let duration = try await asset.load(.duration)
+
                 let durationInSeconds = Float(CMTimeGetSeconds(duration))
 
                 guard durationInSeconds > 0 && !durationInSeconds.isNaN && !durationInSeconds.isInfinite else {
