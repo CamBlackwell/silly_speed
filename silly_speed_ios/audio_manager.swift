@@ -69,9 +69,9 @@ class AudioManager: NSObject, ObservableObject {
             return audioFiles.sorted { $0.dateAdded > $1.dateAdded }
         }
         
-        return masterPlaylist.audioFileIDs.compactMap { id in
-            audioFiles.first { $0.id == id }
-        }
+        return masterPlaylist.audioFileIDs
+            .compactMap { id in audioFiles.first { $0.id == id } }
+            .sorted { $0.dateAdded > $1.dateAdded }
     }
     
     var sortedPlaylists: [Playlist] {
@@ -738,9 +738,9 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     func getAudioFiles(for playlist: Playlist) -> [AudioFile] {
-        return playlist.audioFileIDs.compactMap { id in
-            audioFiles.first { $0.id == id }
-        }
+        return playlist.audioFileIDs
+            .compactMap { id in audioFiles.first { $0.id == id } }
+            .sorted { $0.dateAdded > $1.dateAdded }
     }
     
     private func savePlaylists() {
