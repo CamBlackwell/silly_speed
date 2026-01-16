@@ -234,15 +234,6 @@ struct ContentView: View {
                 }
                 .tint(theme.accentColor)
 
-            } else if libraryFilter == .playlists {
-                Button {
-                    showingCreatePlaylistAlert = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.title2)
-                }
-                .tint(theme.accentColor)
-
             } else {
                 Menu {
                     Button {
