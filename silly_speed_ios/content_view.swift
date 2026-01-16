@@ -99,7 +99,7 @@ struct ContentView: View {
                 }
             }
         }
-        //.tint(theme.accentColor)
+        .tint(theme.tint)
     }
 
     private var playlistsPage: some View {
@@ -216,13 +216,6 @@ struct ContentView: View {
     private var trailingToolbarButton: some View {
         Group {
             if libraryFilter == .player {
-                Button {
-                    navigateToPlayer = false
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.title2)
-                }
-                .tint(theme.accentColor)
 
             } else if isReorderMode {
                 Button {
