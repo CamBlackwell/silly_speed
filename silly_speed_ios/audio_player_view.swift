@@ -12,7 +12,7 @@ struct AudioPlayerView: View {
 
     var body: some View {
         ZStack {
-            Color(theme.backgroundColor)
+            theme.backgroundColor
                 .ignoresSafeArea()
 
             VStack(spacing: 8) {
@@ -224,7 +224,7 @@ struct AudioPlayerView: View {
 
                         Image(systemName: isThisFilePlaying ? "pause.fill" : "play.fill")
                             .font(.title)
-                            .foregroundStyle(theme.textColor)
+                            .foregroundStyle(theme.playButtonColor)
                     }
                 }
                 .buttonStyle(PlainButtonStyle())

@@ -32,7 +32,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                Color(theme.backgroundColor)
+                theme.backgroundColor
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
@@ -66,6 +66,9 @@ struct ContentView: View {
                 }
             }
             .toolbar { toolbarContent }
+            .navigationDestination(isPresented: $showingSettings) {
+                SettingsView()
+            }
             .applySheets(
                 showingFilePicker: $showingFilePicker,
                 showingSettings: $showingSettings,
@@ -96,7 +99,7 @@ struct ContentView: View {
                 }
             }
         }
-        .tint(theme.accentColor)
+        //.tint(theme.accentColor)
     }
 
     private var playlistsPage: some View {
@@ -172,95 +175,107 @@ struct ContentView: View {
     }
     
     private var leadingToolbarButton: some View {
-            Group {
-                if libraryFilter == .player {
+        Group {
+            if libraryFilter == .player {
+                Button {
+                    withAnimation {
+                        libraryFilter = .songs
+                    }
+                } label: {
+                    Image(systemName: "chevron.backward")
+                        .font(.title2)
+                }
+                .tint(theme.accentColor)
+            } else {
+                if !isReorderMode && !isMultiSelectMode {
                     Button {
-                        withAnimation {
-                            libraryFilter = .songs
+                        isMultiSelectMode = true
+                        selectedFileIDs.removeAll()
+                    } label: {
+                        Image(systemName: "checkmark.circle")
+                            .font(.title2)
+                    }
+                    .tint(theme.accentColor)
+                } else if isMultiSelectMode {
+                    Button {
+                        if selectedFileIDs.count == audioManager.displayedSongs.count {
+                            selectedFileIDs.removeAll()
+                        } else {
+                            selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
                         }
                     } label: {
-                        Image(systemName: "chevron.backward")
-                            .font(.title2)
-                            .foregroundStyle(theme.accentColor)
+                        Text("Select All")
                     }
-                } else {
-                    if !isReorderMode && !isMultiSelectMode {
-                        Button {
-                            isMultiSelectMode = true
-                            selectedFileIDs.removeAll()
-                        } label: {
-                            Image(systemName: "checkmark.circle")
-                                .font(.title2)
-                                .foregroundStyle(theme.accentColor)
-                        }
-                    } else if isMultiSelectMode {
-                        Button {
-                            if selectedFileIDs.count == audioManager.displayedSongs.count {
-                                selectedFileIDs.removeAll()
-                            } else {
-                                selectedFileIDs = Set(audioManager.displayedSongs.map { $0.id })
-                            }
-                        } label: {
-                            Text("Select All")
-                                .foregroundStyle(theme.accentColor)
-                        }
-                    }
+                    .tint(theme.accentColor)
                 }
             }
         }
+    }
+
     
     private var trailingToolbarButton: some View {
-            Group {
-                if libraryFilter != .player {
-                    if isReorderMode || isMultiSelectMode {
-                        Button {
-                            if isReorderMode {
-                                isReorderMode = false
-                            } else {
-                                isMultiSelectMode = false
-                                selectedFileIDs.removeAll()
-                            }
-                        } label: {
-                            Text("Done")
-                                .foregroundStyle(theme.accentColor)
-                        }
-                    } else {
-                        Menu {
-                            Button {
-                                showingFilePicker = true
-                            } label: {
-                                Label("Add Songs", systemImage: "music.note.list")
-                            }
-                            
-                            Button {
-                                newPlaylistName = ""
-                                showingCreatePlaylistAlert = true
-                            } label: {
-                                Label("Create Playlist", systemImage: "text.badge.plus")
-                            }
-                            
-                            Button {
-                                showingSettings = true
-                            } label: {
-                                Label("Settings", systemImage: "gear")
-                            }
-                            
-                            if libraryFilter == .songs {
-                                Button {
-                                    isReorderMode = true
-                                } label: {
-                                    Label("Reorder Songs", systemImage: "arrow.up.arrow.down")
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.title2)
-                                .foregroundStyle(theme.accentColor)
-                        }
-                    }
+        Group {
+            if libraryFilter == .player {
+                Button {
+                    navigateToPlayer = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.title2)
                 }
+                .tint(theme.accentColor)
+
+            } else if isReorderMode {
+                Button {
+                    isReorderMode = false
+                } label: {
+                    Text("Done")
+                }
+                .tint(theme.accentColor)
+
+            } else if isMultiSelectMode {
+                Button {
+                    isMultiSelectMode = false
+                    selectedFileIDs.removeAll()
+                } label: {
+                    Text("Done")
+                }
+                .tint(theme.accentColor)
+
+            } else if libraryFilter == .playlists {
+                Button {
+                    showingCreatePlaylistAlert = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.title2)
+                }
+                .tint(theme.accentColor)
+
+            } else {
+                Menu {
+                    Button {
+                        showingFilePicker = true
+                    } label: {
+                        Label("Add Songs", systemImage: "music.note")
+                    }
+                    Button {
+                        showingCreatePlaylistAlert = true
+                    } label: {
+                        Label("Add playlist", systemImage: "music.note.list")
+                    }
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gear")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title2)
+                }
+                .tint(theme.accentColor)
             }
         }
+    }
+
 
 
     private var bottomTabBar: some View {
@@ -342,7 +357,6 @@ extension View {
             .sheet(isPresented: showingFilePicker) {
                 DocumentPicker(audioManager: audioManager)
             }
-            .sheet(isPresented: showingSettings) { SettingsView() }
             .sheet(isPresented: showingShareSheet) {
                 if let url = shareURL.wrappedValue {
                     ShareSheet(activityItems: [url])
@@ -570,7 +584,7 @@ struct SongsListView: View {
             AddActionButton(title: "Add Songs") {
                 showingFilePicker = true
             }
-            .listRowBackground(Color(theme.backgroundColor))
+            .listRowBackground(theme.backgroundColor)
             .listRowSeparator(.hidden)
             .padding(.bottom, 0)
             
@@ -596,7 +610,7 @@ struct SongsListView: View {
                     showingBatchPlaylistMenu: $showingBatchPlaylistMenu,
                     showingBatchDeleteAlert: $showingBatchDeleteAlert
                 )
-                .listRowBackground(Color(theme.backgroundColor))
+                .listRowBackground(theme.backgroundColor)
                 .listRowSeparator(.hidden)
 
             }
@@ -622,7 +636,7 @@ struct SongsListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Color(theme.backgroundColor))
+        .background(theme.backgroundColor)
         .environment(
             \.editMode,
             (isReorderMode || isMultiSelectMode)
@@ -701,7 +715,7 @@ struct PlaylistsListView: View {
                 newPlaylistName = ""
                 showingCreatePlaylistAlert = true
             }
-            .listRowBackground(Color(theme.backgroundColor))
+            .listRowBackground(theme.backgroundColor)
             .listRowSeparator(.hidden)
             .padding(.bottom, 0)
 
@@ -723,7 +737,7 @@ struct PlaylistsListView: View {
                         audioManager: audioManager
                     )
                 }
-                .listRowBackground(Color(theme.backgroundColor))
+                .listRowBackground(theme.backgroundColor)
                 .listRowSeparator(.hidden)
                 .contextMenu {
                     Button(
@@ -758,7 +772,7 @@ struct PlaylistsListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Color(theme.backgroundColor))
+        .background(theme.backgroundColor)
     }
 }
 
@@ -915,7 +929,7 @@ struct PlaylistRowView: View {
 
                 Text("\(playlistSongs.count) songs")
                     .font(.caption)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(theme.secondaryTextColor)
             }
 
             Spacer()
@@ -1043,7 +1057,7 @@ struct AudioFileButton: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
-        .background(Color(theme.backgroundColor))
+        .background(theme.backgroundColor)
         .contextMenu {
             if !isReorderMode {
                 if isMultiSelectMode && selectedFileIDs.contains(audioFile.id) {
