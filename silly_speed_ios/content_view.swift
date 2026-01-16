@@ -152,7 +152,7 @@ struct ContentView: View {
 
     private var playerPage: some View {
         ZStack {
-            if let file = selectedAudioFile {
+            if let file = selectedAudioFile ?? audioManager.audioFiles.first {
                 AudioPlayerView(
                     audioFile: file,
                     audioManager: audioManager
@@ -162,6 +162,7 @@ struct ContentView: View {
             }
         }
     }
+
     
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
@@ -282,14 +283,16 @@ struct ContentView: View {
                 icon: "play.circle.fill",
                 title: "Player",
                 isSelected: libraryFilter == .player,
-                isDisabled: audioManager.currentlyPlayingID == nil,
+                isDisabled: audioManager.audioFiles.isEmpty,
                 action: {
                     if let currentFile = audioManager.audioFiles.first(where: {
                         $0.id == audioManager.currentlyPlayingID
                     }) {
                         selectedAudioFile = currentFile
-                        libraryFilter = .player
+                    } else if let firstFile = audioManager.audioFiles.first {
+                        selectedAudioFile = firstFile
                     }
+                    libraryFilter = .player
                 }
             )
         }

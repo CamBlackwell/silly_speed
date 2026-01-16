@@ -211,6 +211,10 @@ struct AudioPlayerView: View {
                 .buttonStyle(PlainButtonStyle())
 
                 Button(action: {
+                    if audioManager.audioFiles.isEmpty {
+                        return
+                    }
+
                     if audioManager.currentlyPlayingID == currentFile.id {
                         audioManager.togglePlayPause()
                     } else {
