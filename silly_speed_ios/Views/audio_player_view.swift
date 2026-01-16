@@ -104,25 +104,9 @@ struct AudioPlayerView: View {
                 .transition(.scale.combined(with: .opacity))
 
         case .albumArt:
-            if let name = currentFile.artworkImageName,
-               let artwork = audioManager.loadArtworkImage(name) {
-                Image(uiImage: artwork)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxHeight: .infinity)
-                    .cornerRadius(12)
-                    .transition(.scale.combined(with: .opacity))
-            } else {
-                VStack(spacing: 20) {
-                    Image(systemName: "photo")
-                        .font(.system(size: 60))
-                        .foregroundStyle(theme.secondaryTextColor.opacity(0.5))
-                    Text("No artwork")
-                        .foregroundStyle(theme.secondaryTextColor)
-                }
+            AlbumArtView(audioManager: audioManager, file: currentFile, theme: _theme)
                 .frame(maxHeight: .infinity)
                 .transition(.scale.combined(with: .opacity))
-            }
         }
     }
 
@@ -354,5 +338,38 @@ struct AudioPlayerView: View {
                 .foregroundStyle(theme.accentColor)
         }
         .padding(.horizontal)
+    }
+}
+
+
+struct AlbumArtView: View {
+    @ObservedObject var audioManager: AudioManager
+    let file: AudioFile
+    @EnvironmentObject var theme: ThemeManager
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let img = image {
+                Image(uiImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .cornerRadius(12)
+            } else {
+                VStack(spacing: 20) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 60))
+                        .foregroundStyle(theme.secondaryTextColor.opacity(0.5))
+                    Text("No artwork")
+                        .foregroundStyle(theme.secondaryTextColor)
+                }
+            }
+        }
+        .task {
+            if let name = file.artworkImageName {
+                image = await audioManager.loadArtworkImage(name)
+            }
+        }
     }
 }

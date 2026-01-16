@@ -31,8 +31,6 @@ struct ContentView: View {
     @State private var songGridColumns = UserDefaults.standard.integer(forKey: "songGridColumns") == 0 ? 3 : UserDefaults.standard.integer(forKey: "songGridColumns")
     @State private var playlistGridColumns = UserDefaults.standard.integer(forKey: "playlistGridColumns") == 0 ? 3 : UserDefaults.standard.integer(forKey: "playlistGridColumns")
 
-
-    
     
     var body: some View {
         NavigationStack {
@@ -227,7 +225,10 @@ struct ContentView: View {
                     }
 
                     LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: max(gridColumns, 1)),
+                        columns: Array(
+                            repeating: GridItem(.flexible(), spacing: 10),
+                            count: max(gridColumns, 1)
+                        ),
                         spacing: 16
                     ) {
                         ForEach(audioManager.sortedPlaylists) { playlist in
@@ -243,29 +244,10 @@ struct ContentView: View {
                                     artworkTarget: $artworkTarget
                                 )
                             } label: {
-                                VStack(spacing: 6) {
-                                    ZStack {
-                                        if let art = playlist.artworkImageName,
-                                           let ui = audioManager.loadArtworkImage(art) {
-                                            Image(uiImage: ui)
-                                                .resizable()
-                                                .aspectRatio(1, contentMode: .fill)
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        } else {
-                                            Image(systemName: "music.note.list")
-                                                .font(.largeTitle)
-                                                .foregroundStyle(theme.secondaryTextColor)
-                                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                                .aspectRatio(1, contentMode: .fit)
-                                        }
-                                    }
-
-                                    Text(playlist.name)
-                                        .font(.caption)
-                                        .foregroundStyle(theme.textColor)
-                                        .lineLimit(1)
-                                }
-                                .padding(.horizontal, 4)
+                                PlaylistGridCell(
+                                    playlist: playlist,
+                                    audioManager: audioManager
+                                )
                             }
                             .buttonStyle(.plain)
                             .contextMenu {
@@ -297,9 +279,42 @@ struct ContentView: View {
         }
     }
 
+    struct PlaylistGridCell: View {
+        let playlist: Playlist
+        @ObservedObject var audioManager: AudioManager
+        @EnvironmentObject var theme: ThemeManager
+        @State private var artworkImage: UIImage?
 
+        var body: some View {
+            VStack(spacing: 6) {
+                ZStack {
+                    if let image = artworkImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(1, contentMode: .fill)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Image(systemName: "music.note.list")
+                            .font(.largeTitle)
+                            .foregroundStyle(theme.secondaryTextColor)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .aspectRatio(1, contentMode: .fit)
+                    }
+                }
 
-
+                Text(playlist.name)
+                    .font(.caption)
+                    .foregroundStyle(theme.textColor)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 4)
+            .task {
+                if let artName = playlist.artworkImageName {
+                    artworkImage = await audioManager.loadArtworkImage(artName)
+                }
+            }
+        }
+    }
 
     
     struct SongsGridView: View {
@@ -331,118 +346,22 @@ struct ContentView: View {
                     }
 
                     LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: max(gridColumns, 1)),
+                        columns: Array(
+                            repeating: GridItem(.flexible(), spacing: 10),
+                            count: max(gridColumns, 1)
+                        ),
                         spacing: 16
                     ) {
                         ForEach(audioManager.displayedSongs) { audioFile in
-                            let isPlaying =
-                                audioManager.currentlyPlayingID == audioFile.id &&
-                                audioManager.playingFromSongsTab == true
-
-                            VStack(spacing: 6) {
-                                ZStack {
-                                    if let name = audioFile.artworkImageName,
-                                       let ui = audioManager.loadArtworkImage(name) {
-                                        Image(uiImage: ui)
-                                            .resizable()
-                                            .aspectRatio(1, contentMode: .fill)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    } else {
-                                        Image(systemName: "face.smiling")
-                                            .font(.largeTitle)
-                                            .foregroundStyle(theme.secondaryTextColor)
-                                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                            .aspectRatio(1, contentMode: .fit)
-                                    }
-
-                                    if isMultiSelectMode && selectedFileIDs.contains(audioFile.id) {
-                                        Color.black.opacity(0.4)
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 28))
-                                            .foregroundStyle(theme.accentColor)
-                                    }
-                                }
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(isPlaying ? theme.accentColor : .clear, lineWidth: 2)
-                                )
-                                .onTapGesture {
-                                    Task {
-                                        if isMultiSelectMode {
-                                            if selectedFileIDs.contains(audioFile.id) {
-                                                selectedFileIDs.remove(audioFile.id)
-                                            } else {
-                                                selectedFileIDs.insert(audioFile.id)
-                                            }
-                                        } else {
-                                            await audioManager.playAsync(
-                                                audioFile,
-                                                context: audioManager.displayedSongs,
-                                                fromSongsTab: true
-                                            )
-                                        }
-                                    }
-                                }
-
-                                .contextMenu {
-                                    if isMultiSelectMode && selectedFileIDs.contains(audioFile.id) {
-                                        Button {
-                                            shareURLs = prepareShareURLs()
-                                            showingShareSheet = true
-                                        } label: {
-                                            Label("Share \(selectedFileIDs.count) Files", systemImage: "square.and.arrow.up")
-                                        }
-
-                                        Button {
-                                            artworkTarget = .multipleFiles(selectedFileIDs)
-                                        } label: {
-                                            Label("Set Artwork for \(selectedFileIDs.count)", systemImage: "photo")
-                                        }
-
-                                        Button {
-                                            showingBatchPlaylistMenu = true
-                                        } label: {
-                                            Label("Add \(selectedFileIDs.count) to Playlist", systemImage: "text.badge.plus")
-                                        }
-
-                                        Button(role: .destructive) {
-                                            showingBatchDeleteAlert = true
-                                        } label: {
-                                            Label("Delete \(selectedFileIDs.count)", systemImage: "trash")
-                                        }
-
-                                    } else if !isMultiSelectMode {
-                                        Button {
-                                            artworkTarget = .audioFile(audioFile)
-                                        } label: {
-                                            Label("Set Artwork", systemImage: "photo")
-                                        }
-
-                                        Menu {
-                                            ForEach(audioManager.sortedPlaylists) { playlist in
-                                                Button(playlist.name) {
-                                                    audioManager.addAudioFile(audioFile, to: playlist)
-                                                }
-                                            }
-                                        } label: {
-                                            Label("Add to Playlist", systemImage: "plus")
-                                        }
-
-                                        Button(role: .destructive) {
-                                            audioManager.deleteAudioFile(audioFile)
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                    }
-                                }
-
-                                Text(audioFile.title)
-                                    .font(.caption)
-                                    .foregroundStyle(theme.textColor)
-                                    .lineLimit(1)
-                            }
-                            .padding(.horizontal, 4)
-                            .buttonStyle(.plain)
+                            SongGridCell(
+                                audioFile: audioFile,
+                                audioManager: audioManager,
+                                isMultiSelectMode: isMultiSelectMode,
+                                selectedFileIDs: $selectedFileIDs,
+                                artworkTarget: $artworkTarget,
+                                showingBatchPlaylistMenu: $showingBatchPlaylistMenu,
+                                showingBatchDeleteAlert: $showingBatchDeleteAlert
+                            )
                         }
                     }
                 }
@@ -495,9 +414,164 @@ struct ContentView: View {
         }
     }
 
+    struct SongGridCell: View {
+        let audioFile: AudioFile
+        @ObservedObject var audioManager: AudioManager
+        @EnvironmentObject var theme: ThemeManager
+        let isMultiSelectMode: Bool
+        @Binding var selectedFileIDs: Set<UUID>
+        @Binding var artworkTarget: ArtworkTarget?
+        @Binding var showingBatchPlaylistMenu: Bool
+        @Binding var showingBatchDeleteAlert: Bool
+        @State private var showingShareSheet = false
+        @State private var shareURLs: [URL] = []
 
+        private var isPlaying: Bool {
+            audioManager.currentlyPlayingID == audioFile.id &&
+            audioManager.playingFromSongsTab == true
+        }
 
+        var body: some View {
+            VStack(spacing: 6) {
+                SongArtworkView(
+                    audioManager: audioManager,
+                    audioFile: audioFile,
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isPlaying ? theme.accentColor : .clear, lineWidth: 2)
+                )
+                .onTapGesture {
+                    handleTap()
+                }
+                .contextMenu {
+                    contextMenuContent
+                }
 
+                Text(audioFile.title)
+                    .font(.caption)
+                    .foregroundStyle(theme.textColor)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 4)
+            .buttonStyle(.plain)
+        }
+
+        private func handleTap() {
+            if isMultiSelectMode {
+                if selectedFileIDs.contains(audioFile.id) {
+                    selectedFileIDs.remove(audioFile.id)
+                } else {
+                    selectedFileIDs.insert(audioFile.id)
+                }
+            } else {
+                Task {
+                    await audioManager.playAsync(
+                        audioFile,
+                        context: audioManager.displayedSongs,
+                        fromSongsTab: true
+                    )
+                }
+            }
+        }
+
+        @ViewBuilder
+        private var contextMenuContent: some View {
+            if isMultiSelectMode && selectedFileIDs.contains(audioFile.id) {
+                Button {
+                    shareURLs = prepareShareURLs()
+                    showingShareSheet = true
+                } label: {
+                    Label("Share \(selectedFileIDs.count) Files", systemImage: "square.and.arrow.up")
+                }
+
+                Button {
+                    artworkTarget = .multipleFiles(selectedFileIDs)
+                } label: {
+                    Label("Set Artwork for \(selectedFileIDs.count)", systemImage: "photo")
+                }
+
+                Button {
+                    showingBatchPlaylistMenu = true
+                } label: {
+                    Label("Add \(selectedFileIDs.count) to Playlist", systemImage: "text.badge.plus")
+                }
+
+                Button(role: .destructive) {
+                    showingBatchDeleteAlert = true
+                } label: {
+                    Label("Delete \(selectedFileIDs.count)", systemImage: "trash")
+                }
+            } else if !isMultiSelectMode {
+                Button {
+                    artworkTarget = .audioFile(audioFile)
+                } label: {
+                    Label("Set Artwork", systemImage: "photo")
+                }
+
+                Menu {
+                    ForEach(audioManager.sortedPlaylists) { playlist in
+                        Button(playlist.name) {
+                            audioManager.addAudioFile(audioFile, to: playlist)
+                        }
+                    }
+                } label: {
+                    Label("Add to Playlist", systemImage: "plus")
+                }
+
+                Button(role: .destructive) {
+                    audioManager.deleteAudioFile(audioFile)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+
+        private func prepareShareURLs() -> [URL] {
+            let temp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try? FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+
+            var urls: [URL] = []
+            for id in selectedFileIDs {
+                if let file = audioManager.audioFiles.first(where: { $0.id == id }) {
+                    let dest = temp.appendingPathComponent(file.fileURL.lastPathComponent)
+                    try? FileManager.default.copyItem(at: file.fileURL, to: dest)
+                    urls.append(dest)
+                }
+            }
+            return urls
+        }
+    }
+    
+    struct SongArtworkView: View {
+        @ObservedObject var audioManager: AudioManager
+        let audioFile: AudioFile
+        @EnvironmentObject var theme: ThemeManager
+
+        @State private var artwork: UIImage?
+
+        var body: some View {
+            ZStack {
+                if let art = artwork {
+                    Image(uiImage: art)
+                        .resizable()
+                        .aspectRatio(1, contentMode: .fill)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    Image(systemName: "face.smiling")
+                        .font(.largeTitle)
+                        .foregroundStyle(theme.secondaryTextColor)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .aspectRatio(1, contentMode: .fit)
+                }
+            }
+            .task {
+                if let name = audioFile.artworkImageName {
+                    artwork = await audioManager.loadArtworkImage(name)
+                }
+            }
+        }
+    }
 
     private var playerPage: some View {
         ZStack {
@@ -662,9 +736,6 @@ struct ContentView: View {
         }
     }
 
-
-
-
     private var bottomTabBar: some View {
         HStack(spacing: 0) {
             BottomTabButton(
@@ -703,8 +774,6 @@ struct ContentView: View {
         .ignoresSafeArea(edges: .bottom)
     }
 }
-
-
 
 struct BottomTabButton: View {
     @EnvironmentObject var theme: ThemeManager
@@ -976,8 +1045,6 @@ struct SongsListView: View {
             .listRowBackground(theme.backgroundColor)
             .listRowSeparator(.hidden)
             .padding(.bottom, 0)
-            
-            
 
             ForEach(sortedSongs, id: \.id) { audioFile in
                 AudioFileButton(
@@ -1001,7 +1068,6 @@ struct SongsListView: View {
                 )
                 .listRowBackground(theme.backgroundColor)
                 .listRowSeparator(.hidden)
-
             }
             .onMove { source, destination in
                 if isMultiSelectMode && !selectedFileIDs.isEmpty {
@@ -1020,8 +1086,6 @@ struct SongsListView: View {
                     audioManager.reorderSongs(from: source, to: destination)
                 }
             }
-
-            //Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -1157,7 +1221,6 @@ struct PlaylistsListView: View {
                     }
                 }
             }
-            //Color.clear.frame(height: 35).listRowBackground(Color.clear).listRowSeparator(.hidden)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -1250,7 +1313,7 @@ struct MiniPlayerBar: View {
                         Rectangle()
                             .fill(theme.accentColor)
                             .frame(
-                                width: geometry.size.width * progressPercentage,
+                                width: max(0, geometry.size.width * max(0, min(progressPercentage, 1))),
                                 height: 3
                             )
                     }
@@ -1277,19 +1340,7 @@ struct PlaylistRowView: View {
     let playlist: Playlist
     @ObservedObject var audioManager: AudioManager
     @EnvironmentObject var theme: ThemeManager
-
-    var artworkImage: UIImage? {
-        guard
-            let currentPlaylist = audioManager.playlists.first(where: {
-                $0.id == playlist.id
-            }),
-            let artworkName = currentPlaylist.artworkImageName
-        else {
-            return nil
-        }
-
-        return audioManager.loadArtworkImage(artworkName)
-    }
+    @State private var artworkImage: UIImage?
 
     var playlistSongs: [AudioFile] {
         audioManager.getAudioFiles(for: playlist)
@@ -1322,6 +1373,11 @@ struct PlaylistRowView: View {
             }
 
             Spacer()
+        }
+        .task {
+            if let artName = playlist.artworkImageName {
+                artworkImage = await audioManager.loadArtworkImage(artName)
+            }
         }
     }
 }
@@ -1413,29 +1469,7 @@ struct AudioFileButton: View {
 
     var body: some View {
         Button {
-            if isMultiSelectMode {
-                if selectedFileIDs.contains(audioFile.id) {
-                    selectedFileIDs.remove(audioFile.id)
-                } else {
-                    selectedFileIDs.insert(audioFile.id)
-                }
-            } else if !isReorderMode {
-                let isSameSong = audioManager.currentlyPlayingID == audioFile.id
-                let isSameContext =
-                    audioManager.playingFromSongsTab == isFromSongsTab
-                if isSameSong && isSameContext {
-                    selectedAudioFile = audioFile
-                    navigateToPlayer = true
-                } else {
-                    Task {
-                        await audioManager.playAsync(
-                            audioFile,
-                            context: context,
-                            fromSongsTab: isFromSongsTab
-                        )
-                    }
-                }
-            }
+            handleButtonTap()
         } label: {
             AudioFileRow(
                 audioFile: audioFile,
@@ -1476,8 +1510,33 @@ struct AudioFileButton: View {
             }
         }
     }
-}
 
+    private func handleButtonTap() {
+        if isMultiSelectMode {
+            if selectedFileIDs.contains(audioFile.id) {
+                selectedFileIDs.remove(audioFile.id)
+            } else {
+                selectedFileIDs.insert(audioFile.id)
+            }
+        } else if !isReorderMode {
+            let isSameSong = audioManager.currentlyPlayingID == audioFile.id
+            let isSameContext =
+                audioManager.playingFromSongsTab == isFromSongsTab
+            if isSameSong && isSameContext {
+                selectedAudioFile = audioFile
+                navigateToPlayer = true
+            } else {
+                Task {
+                    await audioManager.playAsync(
+                        audioFile,
+                        context: context,
+                        fromSongsTab: isFromSongsTab
+                    )
+                }
+            }
+        }
+    }
+}
 
 struct MultiSelectContextMenu: View {
     @ObservedObject var audioManager: AudioManager
@@ -1556,12 +1615,6 @@ struct AddActionButton: View {
     var body: some View {
         Button(action: action) {
             HStack(alignment: .center) {
-                /*Image(systemName: "plus.square.fill")
-                    .font(.title2)
-                    .foregroundStyle(theme.accentColor)
-                    .frame(width: 35, height: 35)
-                    .padding(.leading, 8)
-                 */
                 Spacer()
                 Text(title)
                     .font(.headline)
@@ -1583,6 +1636,7 @@ struct AudioFileRow: View {
     @EnvironmentObject var theme: ThemeManager
     var isMultiSelectMode: Bool = false
     var isSelected: Bool = false
+    @State private var artworkImage: UIImage?
 
     var body: some View {
         HStack {
@@ -1596,9 +1650,7 @@ struct AudioFileRow: View {
                 .font(.title2)
             }
 
-            if let artworkName = audioFile.artworkImageName,
-                let image = audioManager.loadArtworkImage(artworkName)
-            {
+            if let image = artworkImage {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -1623,6 +1675,7 @@ struct AudioFileRow: View {
                 .font(.title2)
                 .frame(width: 35, height: 35)
             }
+            
             VStack(alignment: .leading, spacing: 4) {
                 Text(audioFile.title)
                     .font(.headline)
@@ -1646,8 +1699,13 @@ struct AudioFileRow: View {
                 ).font(.caption)
             }
         }
-        //.padding(.vertical, 4)
+        .task {
+            if let artName = audioFile.artworkImageName {
+                artworkImage = await audioManager.loadArtworkImage(artName)
+            }
+        }
     }
+    
     private func formatTime(_ time: Float) -> String {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
@@ -1678,6 +1736,7 @@ struct AudioFileContextMenu: View {
     @Binding var showingShareSheet: Bool
     @Binding var shareURLs: [URL]
     @Binding var artworkTarget: ArtworkTarget?
+    
     var body: some View {
         Button("share this file", systemImage: "square.and.arrow.up") {
             if let url = audioManager.urlForSharing(audioFile) {
@@ -1724,6 +1783,7 @@ struct AudioFileContextMenu: View {
 struct DocumentPicker: UIViewControllerRepresentable {
     let audioManager: AudioManager
     @Environment(\.dismiss) var dismiss
+    
     func makeUIViewController(context: Context)
         -> UIDocumentPickerViewController
     {
@@ -1734,14 +1794,18 @@ struct DocumentPicker: UIViewControllerRepresentable {
         picker.delegate = context.coordinator
         return picker
     }
+    
     func updateUIViewController(
         _ ui: UIDocumentPickerViewController,
         context: Context
     ) {}
+    
     func makeCoordinator() -> Coordinator { Coordinator(self) }
+    
     class Coordinator: NSObject, UIDocumentPickerDelegate {
         let parent: DocumentPicker
         init(_ parent: DocumentPicker) { self.parent = parent }
+        
         func documentPicker(
             _ controller: UIDocumentPickerViewController,
             didPickDocumentsAt urls: [URL]
@@ -1749,6 +1813,7 @@ struct DocumentPicker: UIViewControllerRepresentable {
             for url in urls { parent.audioManager.importAudioFile(from: url) }
             parent.dismiss()
         }
+        
         func documentPickerWasCancelled(
             _ controller: UIDocumentPickerViewController
         ) { parent.dismiss() }

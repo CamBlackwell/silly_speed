@@ -1,17 +1,19 @@
 import Foundation
 
 struct AudioFile: Identifiable, Codable {
+
     let id: UUID
     let fileName: String
     let dateAdded: Date
     let audioDuration: Float
     var artworkImageName: String?
     var title: String
-    
+
     var fileURL: URL {
         AudioManager.fileDirectory.appendingPathComponent(fileName)
     }
-    
+
+    nonisolated
     init(fileName: String, audioDuration: Float, artworkImageName: String? = nil) {
         self.id = UUID()
         self.fileName = fileName
@@ -20,8 +22,16 @@ struct AudioFile: Identifiable, Codable {
         self.artworkImageName = artworkImageName
         self.title = (fileName as NSString).deletingPathExtension
     }
-    
-    init(id: UUID, fileName: String, dateAdded: Date, audioDuration: Float, artworkImageName: String? = nil, title: String? = nil) {
+
+    nonisolated
+    init(
+        id: UUID,
+        fileName: String,
+        dateAdded: Date,
+        audioDuration: Float,
+        artworkImageName: String? = nil,
+        title: String? = nil
+    ) {
         self.id = id
         self.fileName = fileName
         self.dateAdded = dateAdded
@@ -37,7 +47,7 @@ struct Playlist: Identifiable, Codable {
     var audioFileIDs: [UUID]
     let dateAdded: Date
     var artworkImageName: String?
-    
+
     init(name: String, artworkImageName: String? = nil) {
         self.id = UUID()
         self.name = name
@@ -56,14 +66,14 @@ enum LibraryFilter: Hashable {
 enum LibraryItem: Identifiable {
     case song(AudioFile)
     case playlist(Playlist)
-    
+
     var id: UUID {
         switch self {
         case .song(let s): return s.id
         case .playlist(let p): return p.id
         }
     }
-    
+
     var dateAdded: Date {
         switch self {
         case .song(let s): return s.dateAdded
@@ -72,12 +82,11 @@ enum LibraryItem: Identifiable {
     }
 }
 
-
 enum ArtworkTarget: Identifiable {
     case audioFile(AudioFile)
     case playlist(Playlist)
     case multipleFiles(Set<UUID>)
-    
+
     var id: String {
         switch self {
         case .audioFile(let file):
@@ -89,4 +98,3 @@ enum ArtworkTarget: Identifiable {
         }
     }
 }
-
