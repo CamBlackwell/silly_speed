@@ -1,6 +1,28 @@
 import SwiftUI
 import Combine
 
+struct ThemePreset {
+    var background: Color
+    var text: Color
+    var secondaryText: Color
+    var accent: Color
+    var tint: Color
+    var gonioSides: Color
+    var gonioMids: Color
+    var playButton: Color
+    
+    static let empty = ThemePreset(
+        background: .black,
+        text: .white,
+        secondaryText: .gray,
+        accent: .blue,
+        tint: .blue,
+        gonioSides: .red,
+        gonioMids: .purple,
+        playButton: .white
+    )
+}
+
 class ThemeManager: ObservableObject {
     @Published var backgroundColor = Color(red: 0.15, green: 0.15, blue: 0.25)
     @Published var textColor = Color.white
@@ -10,6 +32,12 @@ class ThemeManager: ObservableObject {
     @Published var gonioSidesColor = Color.red
     @Published var gonioMidsColor = Color.purple
     @Published var playButtonColor = Color.white
+    
+    @Published var customPresets: [ThemePreset] = [
+        ThemePreset.empty,
+        ThemePreset.empty,
+        ThemePreset.empty
+    ]
 }
 
 struct SettingsView: View {
@@ -23,8 +51,9 @@ struct SettingsView: View {
     @State private var gonioSidesColor: Color = Color.red
     @State private var gonioMidsColor: Color = Color.purple
     @State private var playButtonColor: Color = Color.white
-    
     @State private var didInitializeFromTheme = false
+    
+    @State private var showingAssignDialog = false
     
     init() {}
     
@@ -35,8 +64,6 @@ struct SettingsView: View {
             
             ScrollView {
                 VStack(spacing: 20) {
-                    
-                    
                     themePreview
                     themePresetsSection
                     
@@ -73,10 +100,20 @@ struct SettingsView: View {
                             ]
                         )
                         
-                        Button("Reset to Default") {
-                            applyDefaultTheme()
+                        Button("Assign Current Theme to…") {
+                            showingAssignDialog = true
                         }
-                        .foregroundStyle(.red)
+                        .foregroundStyle(accentColor)
+                        .confirmationDialog(
+                            "Save Current Theme",
+                            isPresented: $showingAssignDialog,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Custom Preset 1") { savePreset(0) }
+                            Button("Custom Preset 2") { savePreset(1) }
+                            Button("Custom Preset 3") { savePreset(2) }
+                            Button("Cancel", role: .cancel) {}
+                        }
                     }
                     .padding(.horizontal)
                 }
@@ -188,6 +225,10 @@ struct SettingsView: View {
                     presetButton("Midnight") { applyMidnightTheme() }
                     presetButton("Light") { applyLightTheme() }
                     presetButton("Neon") { applyNeonTheme() }
+                    
+                    presetButton("Custom 1") { loadPreset(0) }
+                    presetButton("Custom 2") { loadPreset(1) }
+                    presetButton("Custom 3") { loadPreset(2) }
                 }
                 .padding(.horizontal)
             }
@@ -203,6 +244,31 @@ struct SettingsView: View {
                 .foregroundStyle(accentColor)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         }
+    }
+    
+    private func savePreset(_ index: Int) {
+        theme.customPresets[index] = ThemePreset(
+            background: backgroundColor,
+            text: textColor,
+            secondaryText: secondaryTextColor,
+            accent: accentColor,
+            tint: tintColor,
+            gonioSides: gonioSidesColor,
+            gonioMids: gonioMidsColor,
+            playButton: playButtonColor
+        )
+    }
+    
+    private func loadPreset(_ index: Int) {
+        let p = theme.customPresets[index]
+        backgroundColor = p.background
+        textColor = p.text
+        secondaryTextColor = p.secondaryText
+        accentColor = p.accent
+        tintColor = p.tint
+        gonioSidesColor = p.gonioSides
+        gonioMidsColor = p.gonioMids
+        playButtonColor = p.playButton
     }
     
     private func applyDefaultTheme() {
@@ -360,7 +426,6 @@ struct SettingsView: View {
     }
 }
 
-
 struct ColorControl: Identifiable {
     let id: String
     let name: String
@@ -371,5 +436,4 @@ struct ColorControl: Identifiable {
         self.name = name
         self.binding = binding
     }
-    
 }
