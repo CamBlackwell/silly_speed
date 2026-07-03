@@ -49,6 +49,7 @@
 		CB7BBD2C2F76501D0051E29E /* silly_speed_ios.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = silly_speed_ios.entitlements; sourceTree = "<group>"; };
 		CB7BBD2D2F7650220051E29E /* silly_speed.code-workspace */ = {isa = PBXFileReference; lastKnownFileType = text; path = "silly_speed.code-workspace"; sourceTree = "<group>"; };
 		CB7BBD2F2F76502A0051E29E /* silly_speed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = silly_speed.swift; sourceTree = "<group>"; };
+		CB94FFC02FF7779D0067D808 /* Punches3.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Punches3.entitlements; sourceTree = "<group>"; };
 		CBB46E352FF2198D0003B212 /* AudioHealthHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioHealthHUD.swift; sourceTree = "<group>"; };
 		CBB46EA52FF291440003B212 /* Punches3-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Punches3-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -116,12 +117,16 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				audio_player_view.swift,
+				BlueNoise64.png,
+				ColormapWarp.metal,
 				content_view.swift,
+				Fog.metal,
 				PlaylisList_view.swift,
 				setting_View.swift,
+				ShaderEffects.swift,
 				SpectrumView.swift,
+				TunnelShader.metal,
 				Water.metal,
-				WaterShaderView.swift,
 			);
 			target = CB7BBCBB2F764F220051E29E /* Punches3 */;
 		};
@@ -208,6 +213,7 @@
 		CB7BBCB32F764F220051E29E = {
 			isa = PBXGroup;
 			children = (
+				CB94FFC02FF7779D0067D808 /* Punches3.entitlements */,
 				CBB46EA52FF291440003B212 /* Punches3-Info.plist */,
 				CB7BBCBD2F764F220051E29E /* Products */,
 				CB7BBD342F7650E30051E29E /* AudioEngines */,
@@ -550,6 +556,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Punches3.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = U6Q4B5CXQX;
@@ -557,6 +564,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Punches3-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "To add photos to songs, playlists and albums";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -587,6 +595,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Punches3.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = U6Q4B5CXQX;
@@ -594,6 +603,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Punches3-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "To add photos to songs, playlists and albums";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

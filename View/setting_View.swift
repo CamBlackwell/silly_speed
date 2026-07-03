@@ -1,6 +1,61 @@
 import SwiftUI
 import Combine
 
+// MARK: - Tunnel Shader Quality
+//
+// Bundles the three performance levers for the raymarched tunnel effect
+// (render resolution, march-step budget, fractal-fold budget) plus its
+// frame rate into named tiers, so Settings can offer one simple picker
+// instead of four separate sliders. See TunnelShaderView / TunnelShader.metal
+// for how each value is used.
+
+enum TunnelQuality: String, CaseIterable, Identifiable {
+    case low     = "Low"
+    case balanced = "Balanced"
+    case high    = "High"
+
+    var id: String { rawValue }
+
+    /// Fraction of the real screen resolution the shader renders at.
+    /// The single biggest cost lever — cost scales with pixel count.
+    var resolutionScale: CGFloat {
+        switch self {
+        case .low:      return 0.35
+        case .balanced: return 0.55
+        case .high:     return 0.8
+        }
+    }
+
+    /// Max raymarch steps per pixel.
+    var maxSteps: Int {
+        switch self {
+        case .low:      return 60
+        case .balanced: return 110
+        case .high:     return 180
+        }
+    }
+
+    /// Fractal fold iterations per march step (this loop is nested inside
+    /// the step loop, so it's the most expensive knob per-unit-change).
+    var foldIterations: Int {
+        switch self {
+        case .low:      return 5
+        case .balanced: return 7
+        case .high:     return 9
+        }
+    }
+
+    /// Seconds between frame updates — a slow ambient background doesn't
+    /// need 60fps.
+    var frameInterval: Double {
+        switch self {
+        case .low:      return 1.0 / 24.0
+        case .balanced: return 1.0 / 30.0
+        case .high:     return 1.0 / 60.0
+        }
+    }
+}
+
 // MARK: - Theme Preset
 
 struct ThemePreset {
@@ -12,22 +67,78 @@ struct ThemePreset {
     var gonioSides: Color
     var gonioMids: Color
     var playButton: Color
+    // Water
     var useWaterShader: Bool
     var waterSpeed: Double
     var waterIntensity: Double
+    // Fog
+    var useFogShader: Bool
+    var fogColor: Color
+    var fogSpeed: Double
+    var fogIntensity: Double
+    // Tunnel (raymarched fractal tunnel — see credit in SettingsView)
+    var useTunnelShader: Bool
+    var tunnelColor: Color
+    var tunnelSpeed: Double
+    var tunnelIntensity: Double
+    var tunnelQuality: TunnelQuality
+    // Smoke (colormap-warp effect used behind SpectrumView)
+    var useSmokeShader: Bool
+    var smokeSpeed: Double
+    var smokeIntensity: Double
+    var smokeGrayscale: Double
+
+    /// Convenience init that back-fills fog/tunnel/smoke defaults so every
+    /// existing ThemePreset call site compiles without change.
+    init(
+        background: Color, text: Color, secondaryText: Color,
+        accent: Color, tint: Color, gonioSides: Color, gonioMids: Color,
+        playButton: Color,
+        useWaterShader: Bool, waterSpeed: Double, waterIntensity: Double,
+        useFogShader: Bool = false,
+        fogColor: Color = Color(hex: "#b0c8e0"),
+        fogSpeed: Double = 0.6,
+        fogIntensity: Double = 0.7,
+        useTunnelShader: Bool = false,
+        tunnelColor: Color = Color(hex: "#54a8ff"),
+        tunnelSpeed: Double = 1.0,
+        tunnelIntensity: Double = 1.0,
+        tunnelQuality: TunnelQuality = .balanced,
+        useSmokeShader: Bool = false,
+        smokeSpeed: Double = 1.0,
+        smokeIntensity: Double = 1.0,
+        smokeGrayscale: Double = 0.0
+    ) {
+        self.background     = background
+        self.text           = text
+        self.secondaryText  = secondaryText
+        self.accent         = accent
+        self.tint           = tint
+        self.gonioSides     = gonioSides
+        self.gonioMids      = gonioMids
+        self.playButton     = playButton
+        self.useWaterShader = useWaterShader
+        self.waterSpeed     = waterSpeed
+        self.waterIntensity = waterIntensity
+        self.useFogShader   = useFogShader
+        self.fogColor       = fogColor
+        self.fogSpeed       = fogSpeed
+        self.fogIntensity   = fogIntensity
+        self.useTunnelShader = useTunnelShader
+        self.tunnelColor     = tunnelColor
+        self.tunnelSpeed     = tunnelSpeed
+        self.tunnelIntensity = tunnelIntensity
+        self.tunnelQuality   = tunnelQuality
+        self.useSmokeShader  = useSmokeShader
+        self.smokeSpeed      = smokeSpeed
+        self.smokeIntensity  = smokeIntensity
+        self.smokeGrayscale  = smokeGrayscale
+    }
 
     static let empty = ThemePreset(
-        background: .black,
-        text: .white,
-        secondaryText: .gray,
-        accent: .blue,
-        tint: .blue,
-        gonioSides: .red,
-        gonioMids: .purple,
-        playButton: .white,
-        useWaterShader: false,
-        waterSpeed: 1.0,
-        waterIntensity: 0.5
+        background: .black, text: .white, secondaryText: .gray,
+        accent: .blue, tint: .blue, gonioSides: .red, gonioMids: .purple,
+        playButton: .white, useWaterShader: false, waterSpeed: 1.0, waterIntensity: 0.5
     )
 }
 
@@ -51,6 +162,9 @@ enum AppTheme: String, CaseIterable, Identifiable {
     case solarizedDark  = "Solarized"
     case things         = "Things"
     case water          = "Water"
+    case fog            = "Fog"
+    case mist           = "Mist"
+    case tunnel         = "Tunnel"
 
     // Light
     case minimalLight    = "Default (Light)"
@@ -73,7 +187,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
     static var darkThemes: [AppTheme] {
         [.minimalDark, .atom, .ayu, .catppuccin, .dracula, .eink,
          .everforestDark, .flexoki, .gruvboxDark, .macos, .nord,
-         .rosePineDark, .sky, .solarizedDark, .things, .water]
+         .rosePineDark, .sky, .solarizedDark, .things, .water, .fog, .mist, .tunnel]
     }
 
     static var lightThemes: [AppTheme] {
@@ -314,6 +428,66 @@ enum AppTheme: String, CaseIterable, Identifiable {
                 waterIntensity: 0.8
             )
 
+        case .fog:
+            return ThemePreset(
+                background:    Color(hex: "#0d0f12"),
+                text:          Color(hex: "#d8dce2"),
+                secondaryText: Color(hex: "#6b7280"),
+                accent:        Color(hex: "#9ca3af"),
+                tint:          Color(hex: "#9ca3af"),
+                gonioSides:    Color(hex: "#cbd5e1"),
+                gonioMids:     Color(hex: "#94a3b8"),
+                playButton:    Color(hex: "#d8dce2"),
+                useWaterShader: false,
+                waterSpeed: 1.0, waterIntensity: 0.5,
+                useFogShader: true,
+                fogColor: Color(hex: "#c8d8e8"),
+                fogSpeed: 0.55,
+                fogIntensity: 1.0
+            )
+
+        case .mist:
+            // Water caustics with a thin fog layer on top — underwater mist.
+            return ThemePreset(
+                background:    Color(hex: "#020a14"),
+                text:          Color(hex: "#cceeff"),
+                secondaryText: Color(hex: "#4d8fa8"),
+                accent:        Color(hex: "#2dd4bf"),
+                tint:          Color(hex: "#2dd4bf"),
+                gonioSides:    Color(hex: "#67e8f9"),
+                gonioMids:     Color(hex: "#0ea5e9"),
+                playButton:    Color(hex: "#cceeff"),
+                useWaterShader: true,
+                waterSpeed: 0.8,
+                waterIntensity: 0.6,
+                useFogShader: true,
+                fogColor: Color(hex: "#80c8f0"),
+                fogSpeed: 0.35,
+                fogIntensity: 0.55
+            )
+
+        case .tunnel:
+            // Raymarched fractal tunnel. Shader ported from "RayMarching
+            // starting point" by Martijn Steinrucken (The Art of Code /
+            // BigWings), 2020, MIT License. Credit is also shown live in
+            // SettingsView when this effect is enabled.
+            return ThemePreset(
+                background:    Color(hex: "#05070c"),
+                text:          Color(hex: "#e2ecf7"),
+                secondaryText: Color(hex: "#6d7a8f"),
+                accent:        Color(hex: "#54a8ff"),
+                tint:          Color(hex: "#54a8ff"),
+                gonioSides:    Color(hex: "#8fd3ff"),
+                gonioMids:     Color(hex: "#3d7fd9"),
+                playButton:    Color(hex: "#e2ecf7"),
+                useWaterShader: false,
+                waterSpeed: 1.0, waterIntensity: 0.5,
+                useTunnelShader: true,
+                tunnelColor: Color(hex: "#54a8ff"),
+                tunnelSpeed: 1.0,
+                tunnelIntensity: 1.0
+            )
+
         // ── Light themes ─────────────────────────────────────────────────────
 
         case .minimalLight:
@@ -547,9 +721,27 @@ private enum ThemeKey {
     static let gonioSidesColor    = "theme.gonioSidesColor"
     static let gonioMidsColor     = "theme.gonioMidsColor"
     static let playButtonColor    = "theme.playButtonColor"
+    // Water
     static let useWaterShader     = "theme.useWaterShader"
     static let waterSpeed         = "theme.waterSpeed"
     static let waterIntensity     = "theme.waterIntensity"
+    // Fog
+    static let useFogShader       = "theme.useFogShader"
+    static let fogColor           = "theme.fogColor"
+    static let fogSpeed           = "theme.fogSpeed"
+    static let fogIntensity       = "theme.fogIntensity"
+    // Tunnel
+    static let useTunnelShader    = "theme.useTunnelShader"
+    static let tunnelColor        = "theme.tunnelColor"
+    static let tunnelSpeed        = "theme.tunnelSpeed"
+    static let tunnelIntensity    = "theme.tunnelIntensity"
+    static let tunnelQuality      = "theme.tunnelQuality"
+    // Smoke
+    static let useSmokeShader     = "theme.useSmokeShader"
+    static let smokeSpeed         = "theme.smokeSpeed"
+    static let smokeIntensity     = "theme.smokeIntensity"
+    static let smokeGrayscale     = "theme.smokeGrayscale"
+    // Appearance
     static let appearanceMode     = "theme.appearanceMode"
     static let selectedDarkTheme  = "theme.selectedDarkTheme"
     static let selectedLightTheme = "theme.selectedLightTheme"
@@ -558,7 +750,6 @@ private enum ThemeKey {
 // MARK: - Color ↔ UserDefaults helpers
 
 private extension Color {
-    /// Encodes a Color as a hex string for UserDefaults storage.
     var hexString: String {
         let resolved = UIColor(self)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
@@ -599,7 +790,7 @@ final class ThemeManager: ObservableObject {
         didSet { save(playButtonColor.hexString, for: ThemeKey.playButtonColor) }
     }
 
-    // ── Published shader / behaviour ─────────────────────────────────────────
+    // ── Water shader ─────────────────────────────────────────────────────────
 
     @Published var useWaterShader: Bool {
         didSet { UserDefaults.standard.set(useWaterShader, forKey: ThemeKey.useWaterShader) }
@@ -611,7 +802,61 @@ final class ThemeManager: ObservableObject {
         didSet { UserDefaults.standard.set(waterIntensity, forKey: ThemeKey.waterIntensity) }
     }
 
-    // ── Published appearance / selected themes ────────────────────────────────
+    // Fixed water tint — not user-configurable.
+    let waterColor: Color = Color(hex: "#2A7FAA")
+
+    // ── Fog shader ───────────────────────────────────────────────────────────
+
+    @Published var useFogShader: Bool {
+        didSet { UserDefaults.standard.set(useFogShader, forKey: ThemeKey.useFogShader) }
+    }
+    @Published var fogColor: Color {
+        didSet { save(fogColor.hexString, for: ThemeKey.fogColor) }
+    }
+    @Published var fogSpeed: Double {
+        didSet { UserDefaults.standard.set(fogSpeed, forKey: ThemeKey.fogSpeed) }
+    }
+    @Published var fogIntensity: Double {
+        didSet { UserDefaults.standard.set(fogIntensity, forKey: ThemeKey.fogIntensity) }
+    }
+
+    // ── Tunnel shader ────────────────────────────────────────────────────────
+    // Raymarched fractal tunnel, ported from "RayMarching starting point" by
+    // Martijn Steinrucken (The Art of Code / BigWings), 2020, MIT License.
+
+    @Published var useTunnelShader: Bool {
+        didSet { UserDefaults.standard.set(useTunnelShader, forKey: ThemeKey.useTunnelShader) }
+    }
+    @Published var tunnelColor: Color {
+        didSet { save(tunnelColor.hexString, for: ThemeKey.tunnelColor) }
+    }
+    @Published var tunnelSpeed: Double {
+        didSet { UserDefaults.standard.set(tunnelSpeed, forKey: ThemeKey.tunnelSpeed) }
+    }
+    @Published var tunnelIntensity: Double {
+        didSet { UserDefaults.standard.set(tunnelIntensity, forKey: ThemeKey.tunnelIntensity) }
+    }
+    @Published var tunnelQuality: TunnelQuality {
+        didSet { UserDefaults.standard.set(tunnelQuality.rawValue, forKey: ThemeKey.tunnelQuality) }
+    }
+
+    // ── Smoke shader ─────────────────────────────────────────────────────────
+    // Colormap-warp effect used behind SpectrumView.
+
+    @Published var useSmokeShader: Bool {
+        didSet { UserDefaults.standard.set(useSmokeShader, forKey: ThemeKey.useSmokeShader) }
+    }
+    @Published var smokeSpeed: Double {
+        didSet { UserDefaults.standard.set(smokeSpeed, forKey: ThemeKey.smokeSpeed) }
+    }
+    @Published var smokeIntensity: Double {
+        didSet { UserDefaults.standard.set(smokeIntensity, forKey: ThemeKey.smokeIntensity) }
+    }
+    @Published var smokeGrayscale: Double {
+        didSet { UserDefaults.standard.set(smokeGrayscale, forKey: ThemeKey.smokeGrayscale) }
+    }
+
+    // ── Appearance / selected themes ─────────────────────────────────────────
 
     @Published var appearanceMode: AppearanceMode {
         didSet { UserDefaults.standard.set(appearanceMode.rawValue, forKey: ThemeKey.appearanceMode) }
@@ -623,31 +868,45 @@ final class ThemeManager: ObservableObject {
         didSet { UserDefaults.standard.set(selectedLightTheme.rawValue, forKey: ThemeKey.selectedLightTheme) }
     }
 
-    // Fixed — not user-configurable
-    let waterColor: Color = Color(hex: "#2A7FAA")
-
-    // ── Init: load from UserDefaults, fall back to Nord ───────────────────────
+    // ── Init: load from UserDefaults, fall back to Nord ─────────────────────
 
     init() {
         let ud = UserDefaults.standard
         let nordPreset = AppTheme.nord.preset
 
-        // Restore colours (fall back to Nord defaults)
         backgroundColor    = Self.loadColor(ud, key: ThemeKey.backgroundColor,    default: nordPreset.background)
-        textColor          = Self.loadColor(ud, key: ThemeKey.textColor,          default: nordPreset.text)
-        secondaryTextColor = Self.loadColor(ud, key: ThemeKey.secondaryTextColor, default: nordPreset.secondaryText)
-        accentColor        = Self.loadColor(ud, key: ThemeKey.accentColor,        default: nordPreset.accent)
-        tint               = Self.loadColor(ud, key: ThemeKey.tint,               default: nordPreset.tint)
-        gonioSidesColor    = Self.loadColor(ud, key: ThemeKey.gonioSidesColor,    default: nordPreset.gonioSides)
-        gonioMidsColor     = Self.loadColor(ud, key: ThemeKey.gonioMidsColor,     default: nordPreset.gonioMids)
-        playButtonColor    = Self.loadColor(ud, key: ThemeKey.playButtonColor,    default: nordPreset.playButton)
+        textColor          = Self.loadColor(ud, key: ThemeKey.textColor,           default: nordPreset.text)
+        secondaryTextColor = Self.loadColor(ud, key: ThemeKey.secondaryTextColor,  default: nordPreset.secondaryText)
+        accentColor        = Self.loadColor(ud, key: ThemeKey.accentColor,         default: nordPreset.accent)
+        tint               = Self.loadColor(ud, key: ThemeKey.tint,                default: nordPreset.tint)
+        gonioSidesColor    = Self.loadColor(ud, key: ThemeKey.gonioSidesColor,     default: nordPreset.gonioSides)
+        gonioMidsColor     = Self.loadColor(ud, key: ThemeKey.gonioMidsColor,      default: nordPreset.gonioMids)
+        playButtonColor    = Self.loadColor(ud, key: ThemeKey.playButtonColor,     default: nordPreset.playButton)
 
-        // Restore shader settings
         useWaterShader  = ud.object(forKey: ThemeKey.useWaterShader) as? Bool   ?? nordPreset.useWaterShader
         waterSpeed      = ud.object(forKey: ThemeKey.waterSpeed)     as? Double ?? nordPreset.waterSpeed
         waterIntensity  = ud.object(forKey: ThemeKey.waterIntensity) as? Double ?? nordPreset.waterIntensity
 
-        // Restore appearance mode
+        useFogShader    = ud.object(forKey: ThemeKey.useFogShader)   as? Bool   ?? nordPreset.useFogShader
+        fogColor        = Self.loadColor(ud, key: ThemeKey.fogColor,             default: nordPreset.fogColor)
+        fogSpeed        = ud.object(forKey: ThemeKey.fogSpeed)       as? Double ?? nordPreset.fogSpeed
+        fogIntensity    = ud.object(forKey: ThemeKey.fogIntensity)   as? Double ?? nordPreset.fogIntensity
+
+        useTunnelShader = ud.object(forKey: ThemeKey.useTunnelShader) as? Bool   ?? nordPreset.useTunnelShader
+        tunnelColor     = Self.loadColor(ud, key: ThemeKey.tunnelColor,          default: nordPreset.tunnelColor)
+        tunnelSpeed     = ud.object(forKey: ThemeKey.tunnelSpeed)     as? Double ?? nordPreset.tunnelSpeed
+        tunnelIntensity = ud.object(forKey: ThemeKey.tunnelIntensity) as? Double ?? nordPreset.tunnelIntensity
+        if let raw = ud.string(forKey: ThemeKey.tunnelQuality), let q = TunnelQuality(rawValue: raw) {
+            tunnelQuality = q
+        } else {
+            tunnelQuality = nordPreset.tunnelQuality
+        }
+
+        useSmokeShader  = ud.object(forKey: ThemeKey.useSmokeShader) as? Bool   ?? nordPreset.useSmokeShader
+        smokeSpeed      = ud.object(forKey: ThemeKey.smokeSpeed)     as? Double ?? nordPreset.smokeSpeed
+        smokeIntensity  = ud.object(forKey: ThemeKey.smokeIntensity) as? Double ?? nordPreset.smokeIntensity
+        smokeGrayscale  = ud.object(forKey: ThemeKey.smokeGrayscale) as? Double ?? nordPreset.smokeGrayscale
+
         if let raw = ud.string(forKey: ThemeKey.appearanceMode),
            let mode = AppearanceMode(rawValue: raw) {
             appearanceMode = mode
@@ -655,17 +914,16 @@ final class ThemeManager: ObservableObject {
             appearanceMode = .dark
         }
 
-        // Restore selected themes
         if let raw = ud.string(forKey: ThemeKey.selectedDarkTheme),
-           let theme = AppTheme(rawValue: raw) {
-            selectedDarkTheme = theme
+           let t = AppTheme(rawValue: raw) {
+            selectedDarkTheme = t
         } else {
             selectedDarkTheme = .nord
         }
 
         if let raw = ud.string(forKey: ThemeKey.selectedLightTheme),
-           let theme = AppTheme(rawValue: raw) {
-            selectedLightTheme = theme
+           let t = AppTheme(rawValue: raw) {
+            selectedLightTheme = t
         } else {
             selectedLightTheme = .rosePineLight
         }
@@ -673,7 +931,6 @@ final class ThemeManager: ObservableObject {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /// Apply a named theme preset and persist immediately.
     func apply(_ appTheme: AppTheme) {
         let p = appTheme.preset
         backgroundColor    = p.background
@@ -689,15 +946,25 @@ final class ThemeManager: ObservableObject {
             waterSpeed     = p.waterSpeed
             waterIntensity = p.waterIntensity
         }
-        // Track which named theme is active
+        useFogShader       = p.useFogShader
+        if p.useFogShader {
+            fogColor       = p.fogColor
+            fogSpeed       = p.fogSpeed
+            fogIntensity   = p.fogIntensity
+        }
+        useTunnelShader    = p.useTunnelShader
+        if p.useTunnelShader {
+            tunnelColor     = p.tunnelColor
+            tunnelSpeed     = p.tunnelSpeed
+            tunnelIntensity = p.tunnelIntensity
+        }
         if AppTheme.darkThemes.contains(appTheme) {
-            selectedDarkTheme = appTheme
+            selectedDarkTheme  = appTheme
         } else {
             selectedLightTheme = appTheme
         }
     }
 
-    /// Apply whichever theme matches the current appearanceMode.
     func applyActiveTheme() {
         apply(appearanceMode == .dark ? selectedDarkTheme : selectedLightTheme)
     }
@@ -721,17 +988,17 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack {
-            if theme.useWaterShader {
-                WaterShaderView()
-            } else {
-                theme.backgroundColor.ignoresSafeArea()
-            }
+            // Live animated background — shows exactly what the rest of the
+            // app sees, including water and/or fog if either is enabled.
+            AppBackground()
 
             ScrollView {
                 VStack(spacing: 24) {
                     themePreview
                     themeSelectorsSection
                     waterShaderSection
+                    tunnelShaderSection
+                    fogShaderSection
                 }
                 .padding(.top, 20)
                 .padding(.bottom, 32)
@@ -761,6 +1028,40 @@ struct SettingsView: View {
                 previewSwatch("Mids",        theme.gonioMidsColor)
                 previewSwatch("Play",        theme.playButtonColor)
             }
+
+            // Badge row showing active effects
+            if theme.useWaterShader || theme.useFogShader {
+                HStack(spacing: 8) {
+                    if theme.useWaterShader {
+                        Label("Water", systemImage: "drop.fill")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(Color(hex: "#2dd4bf"))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color(hex: "#2dd4bf").opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                    if theme.useFogShader {
+                        Label("Fog", systemImage: "cloud.fill")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(theme.fogColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(theme.fogColor.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                    if theme.useTunnelShader {
+                        Label("Tunnel", systemImage: "tornado")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(theme.tunnelColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(theme.tunnelColor.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
+                .transition(.opacity.combined(with: .scale))
+            }
         }
         .padding()
         .background(
@@ -772,6 +1073,9 @@ struct SettingsView: View {
                 )
         )
         .padding(.horizontal)
+        .animation(.easeInOut(duration: 0.2), value: theme.useWaterShader)
+        .animation(.easeInOut(duration: 0.2), value: theme.useFogShader)
+        .animation(.easeInOut(duration: 0.2), value: theme.useTunnelShader)
     }
 
     private func previewSwatch(_ label: String, _ color: Color) -> some View {
@@ -795,7 +1099,6 @@ struct SettingsView: View {
                 .foregroundStyle(theme.textColor)
                 .padding(.horizontal)
 
-            // Light / Dark toggle
             VStack(alignment: .leading, spacing: 6) {
                 Text("Appearance")
                     .font(.subheadline)
@@ -814,7 +1117,6 @@ struct SettingsView: View {
                 }
             }
 
-            // Show only the relevant dropdown
             VStack(spacing: 12) {
                 if theme.appearanceMode == .dark {
                     themeDropdown(
@@ -856,26 +1158,20 @@ struct SettingsView: View {
 
             Menu {
                 ForEach(options) { option in
-                    Button(option.rawValue) {
-                        onSelect(option)
-                    }
+                    Button(option.rawValue) { onSelect(option) }
                 }
             } label: {
                 HStack {
-                    // Swatch dot
                     Circle()
                         .fill(selected.preset.background)
                         .frame(width: 14, height: 14)
                         .overlay(
                             Circle().strokeBorder(theme.textColor.opacity(0.2), lineWidth: 1)
                         )
-
                     Text(selected.rawValue)
                         .font(.body)
                         .foregroundStyle(theme.textColor)
-
                     Spacer()
-
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.caption)
                         .foregroundStyle(theme.textColor.opacity(0.5))
@@ -907,9 +1203,7 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(theme.textColor.opacity(0.5))
                 }
-
                 Spacer()
-
                 Toggle("", isOn: $theme.useWaterShader)
                     .tint(theme.accentColor)
                     .labelsHidden()
@@ -917,18 +1211,8 @@ struct SettingsView: View {
 
             if theme.useWaterShader {
                 VStack(spacing: 14) {
-                    sliderRow(
-                        label: "Speed",
-                        value: $theme.waterSpeed,
-                        range: 0.1...3.0,
-                        format: "%.1fx"
-                    )
-                    sliderRow(
-                        label: "Intensity",
-                        value: $theme.waterIntensity,
-                        range: 0.1...2.0,
-                        format: "%.1f"
-                    )
+                    sliderRow(label: "Speed",     value: $theme.waterSpeed,     range: 0.1...3.0, format: "%.1fx")
+                    sliderRow(label: "Intensity", value: $theme.waterIntensity, range: 0.1...2.0, format: "%.1f")
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -941,6 +1225,101 @@ struct SettingsView: View {
         .padding(.horizontal)
         .animation(.easeInOut(duration: 0.2), value: theme.useWaterShader)
     }
+
+    // MARK: - Tunnel Shader Section
+
+    private var tunnelShaderSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Tunnel Effect")
+                        .font(.headline)
+                        .foregroundStyle(theme.textColor)
+                    Text("Raymarched fractal tunnel")
+                        .font(.caption)
+                        .foregroundStyle(theme.textColor.opacity(0.5))
+                }
+                Spacer()
+                Toggle("", isOn: $theme.useTunnelShader)
+                    .tint(theme.accentColor)
+                    .labelsHidden()
+            }
+
+            if theme.useTunnelShader {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Quality")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.textColor.opacity(0.7))
+                    Picker("Quality", selection: $theme.tunnelQuality) {
+                        ForEach(TunnelQuality.allCases) { q in
+                            Text(q.rawValue).tag(q)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                VStack(spacing: 14) {
+                    sliderRow(label: "Speed",     value: $theme.tunnelSpeed,     range: 0.1...3.0, format: "%.1fx")
+                    sliderRow(label: "Intensity", value: $theme.tunnelIntensity, range: 0.1...2.0, format: "%.1f")
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+
+                Text("Lower quality renders at a smaller resolution with a lighter raymarch budget — much easier on the GPU and battery. \"Low\" automatically applies when Low Power Mode is on.")
+                    .font(.caption2)
+                    .foregroundStyle(theme.textColor.opacity(0.4))
+            }
+
+            // Attribution — required by the shader's MIT License and shown
+            // here regardless of whether the effect is currently enabled.
+            Text("Shader based on \"RayMarching starting point\" by Martijn Steinrucken (The Art of Code / BigWings), MIT License.")
+                .font(.caption2)
+                .foregroundStyle(theme.textColor.opacity(0.4))
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(theme.backgroundColor.opacity(0.2))
+        )
+        .padding(.horizontal)
+        .animation(.easeInOut(duration: 0.2), value: theme.useTunnelShader)
+    }
+
+    // MARK: - Fog Shader Section
+
+    private var fogShaderSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Fog Effect")
+                        .font(.headline)
+                        .foregroundStyle(theme.textColor)
+                    Text("PS2-style depth fog with Bayer dithering")
+                        .font(.caption)
+                        .foregroundStyle(theme.textColor.opacity(0.5))
+                }
+                Spacer()
+                Toggle("", isOn: $theme.useFogShader)
+                    .tint(theme.accentColor)
+                    .labelsHidden()
+            }
+
+            if theme.useFogShader {
+                VStack(spacing: 14) {
+                    sliderRow(label: "Density", value: $theme.fogIntensity, range: 0.1...2.0, format: "%.1f")
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(theme.backgroundColor.opacity(0.2))
+        )
+        .padding(.horizontal)
+        .animation(.easeInOut(duration: 0.2), value: theme.useFogShader)
+    }
+
+    // MARK: - Shared slider helper
 
     private func sliderRow(
         label: String,
@@ -962,5 +1341,4 @@ struct SettingsView: View {
                 .tint(theme.accentColor)
         }
     }
-
 }

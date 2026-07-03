@@ -1,7 +1,11 @@
 import SwiftUI
+import Combine
 
 struct SpectrumView: View {
     @ObservedObject var analyzer: UnifiedAudioAnalyser
+    @EnvironmentObject var theme: ThemeManager
+    @State private var time: Double = 0
+    let timer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
     
     // Minimeters Style Gradient: Cold (Bottom) to Hot (Top)
     private let minimetersGradient = LinearGradient(
@@ -18,8 +22,25 @@ struct SpectrumView: View {
     var body: some View {
         VStack {
             ZStack {
-                // Background
-                Color.black
+                ZStack {
+                    if theme.useSmokeShader {
+                        GeometryReader { geo in
+                            Rectangle()
+                                .fill(Color.black)
+                                .colorEffect(
+                                    ShaderLibrary.colormapWarpEffect(
+                                        .float(time * theme.smokeSpeed),
+                                        .float2(geo.size),
+                                        .float(Float(theme.smokeIntensity)),
+                                        .float(Float(theme.smokeGrayscale))
+                                    )
+                                )
+                                .ignoresSafeArea()
+                        }
+                    } else {
+                        Color.black
+                    }
+                }
                 
                 // Custom Spectrum Visualization
                 GeometryReader { geometry in
@@ -73,6 +94,7 @@ struct SpectrumView: View {
             )
         }
         .padding(.horizontal)
+        .onReceive(timer) { _ in time += 1.0 / 60.0 }
     }
 }
 
