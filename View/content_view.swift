@@ -39,12 +39,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                if theme.useWaterShader {
-                    WaterShaderView()
-                } else {
-                    theme.backgroundColor
-                        .ignoresSafeArea()
-                }
+                AppBackground()
 
                 TabView(selection: $libraryFilter) {
                     playlistsPage
@@ -1649,4 +1644,3 @@ struct PhotoPicker: UIViewControllerRepresentable {
         }
     }
 }
-
