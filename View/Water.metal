@@ -131,7 +131,7 @@ inline float3 waterNormal(float2 pos, float e, float depth, int normalIterations
 // inverted from what it should be.
 inline float3 getRay(float2 fragCoord, float2 resolution) {
     float2 uv = ((fragCoord / resolution) * 2.0 - 1.0) * float2(resolution.x / resolution.y, 1.0);
-    uv.y = -uv.y;
+    uv.y = -uv.y - 0.3;
     return normalize(float3(uv.x, uv.y, 1.5));
 }
 

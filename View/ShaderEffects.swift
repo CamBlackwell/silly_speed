@@ -198,10 +198,10 @@ struct TunnelShaderView: View {
                 // low-res buffer's own point space, so it scales with the
                 // resolution drop automatically (lower scale → this radius
                 // covers proportionally more of the final blocky edge).
-                .blur(radius: 1.2)
+                //.blur(radius: 1.2)
                 .scaleEffect(1 / scale, anchor: .topLeading)
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
-                .clipped()
+                //.clipped()
                 // Re-applies crisp blue-noise grain at full resolution, after
                 // the blur above — otherwise the blur would smear the dither
                 // into a soft blob instead of grain. Cheap: one texture
