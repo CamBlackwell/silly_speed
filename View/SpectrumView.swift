@@ -22,26 +22,7 @@ struct SpectrumView: View {
     var body: some View {
         VStack {
             ZStack {
-                ZStack {
-                    if theme.useSmokeShader {
-                        GeometryReader { geo in
-                            Rectangle()
-                                .fill(Color.black)
-                                .colorEffect(
-                                    ShaderLibrary.colormapWarpEffect(
-                                        .float(time * theme.smokeSpeed),
-                                        .float2(geo.size),
-                                        .float(Float(theme.smokeIntensity)),
-                                        .float(Float(theme.smokeGrayscale))
-                                    )
-                                )
-                                .ignoresSafeArea()
-                        }
-                    } else {
-                        Color.black
-                    }
-                }
-                
+
                 // Custom Spectrum Visualization
                 GeometryReader { geometry in
                     Canvas { context, size in

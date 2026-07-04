@@ -237,6 +237,96 @@ struct TunnelShaderView: View {
 }
 
 // ---------------------------------------------------------------------------
+// SmokeShaderView
+//
+// fBM colormap warp, ported to Metal from the Shadertoy shader by
+// trinketMage (2019), https://www.shadertoy.com/view/tdG3Rd. See
+// ColormapWarp.metal for the full port. Surfaced to the rest of the app as
+// the "Smoke" effect — see `ThemeManager.useSmokeShader` / `smokeSpeed` /
+// `smokeIntensity` / `smokeGrayscale` / `smokeQuality` and SettingsView's
+// smokeShaderSection, right alongside Water/Fog/Tunnel.
+//
+// Same performance pattern as Water/Tunnel above, because it has the same
+// problem: three chained fbm() calls (six noise taps each) per pixel isn't
+// cheap in a SwiftUI colorEffect, so:
+//   • Rendered at `quality.resolutionScale` of the real screen size, then
+//     upscaled via .scaleEffect.
+//   • `.drawingGroup(opaque: true)` forces that smaller render to actually
+//     rasterize at reduced size before the upscale, instead of SwiftUI
+//     re-running the shader at full size.
+//   • Its own clock runs at `quality.frameInterval` rather than the app's
+//     60fps timer.
+//   • Low Power Mode always overrides to `.low`, same override rule as
+//     water and tunnel.
+//
+// Quality is a real, user-facing setting — see `SmokeQuality` and
+// `ThemeManager.smokeQuality` in setting_View.swift, with a segmented
+// picker in SettingsView's smoke section alongside water and tunnel.
+// ---------------------------------------------------------------------------
+struct SmokeShaderView: View {
+    @EnvironmentObject var theme: ThemeManager
+    @Environment(\.scenePhase) private var scenePhase
+
+    @State private var time: Double = 0
+    @State private var lowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
+
+    var body: some View {
+        let quality = effectiveQuality
+        let scale = quality.resolutionScale
+
+        return GeometryReader { geo in
+            let renderSize = CGSize(
+                width: max(1, geo.size.width * scale),
+                height: max(1, geo.size.height * scale)
+            )
+
+            Rectangle()
+                // Must be opaque — colorEffect recolors the pixel it's
+                // given, so a transparent fill gives it nothing to work with
+                // and the whole effect renders invisible.
+                .fill(theme.backgroundColor)
+                .colorEffect(
+                    ShaderLibrary.colormapWarpEffect(
+                        .float(time),
+                        .float2(renderSize),
+                        .float(Float(theme.smokeIntensity)),
+                        .float(Float(theme.smokeGrayscale))
+                    )
+                )
+                .frame(width: renderSize.width, height: renderSize.height)
+                .drawingGroup(opaque: true)
+                // Smooths the blocky edges the low-res render leaves once
+                // stretched to full size; radius is in the low-res buffer's
+                // own point space so it auto-scales with the resolution drop.
+                .blur(radius: 1.0)
+                .scaleEffect(1 / scale, anchor: .topLeading)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+                .clipped()
+                .ignoresSafeArea()
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .onReceive(
+            Timer.publish(every: quality.frameInterval, on: .main, in: .common).autoconnect()
+        ) { _ in
+            guard scenePhase == .active else { return }
+            time += quality.frameInterval * theme.smokeSpeed
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)
+        ) { _ in
+            lowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
+        }
+    }
+
+    /// Low Power Mode always wins, same rule as water and tunnel — this is
+    /// what actually saves battery, not just headroom.
+    private var effectiveQuality: SmokeQuality {
+        lowPowerModeEnabled ? .low : theme.smokeQuality
+    }
+}
+
+// ---------------------------------------------------------------------------
 // AppBackground
 //
 // Fog shares the app's single 60fps timer (it's comparatively cheap — a
@@ -248,12 +338,13 @@ struct TunnelShaderView: View {
 //   1. Solid base colour   (always)
 //   2. Water raymarch      (if useWaterShader)
 //   3. Tunnel raymarch     (if useTunnelShader)
-//   4. Fog overlay         (if useFogShader)
+//   4. Smoke colormap warp (if useSmokeShader)
+//   5. Fog overlay         (if useFogShader)
 //
 // Fog stays on top since it's meant to sit over everything ("mist" look).
-// Water and tunnel are both full replacement backdrops rather than blend
-// layers — enabling both together will simply show the tunnel on top,
-// which is expected.
+// Water, tunnel, and smoke are all full replacement backdrops rather than
+// blend layers — enabling more than one together will simply show
+// whichever is later in the ZStack on top, which is expected.
 //
 // Usage:  replace `theme.backgroundColor.ignoresSafeArea()` and any
 //         `WaterShaderView()` call with a single `AppBackground()`.
@@ -281,7 +372,13 @@ struct AppBackground: View {
                 TunnelShaderView()
             }
 
-            // 4. Fog overlay — on top of whatever is below.
+            // 4. Smoke colormap-warp layer — owns its own clock/quality, see
+            //    SmokeShaderView.
+            if theme.useSmokeShader {
+                SmokeShaderView()
+            }
+
+            // 5. Fog overlay — on top of whatever is below.
             if theme.useFogShader {
                 FogShaderView(time: time * theme.fogSpeed)
             }

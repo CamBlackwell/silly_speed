@@ -118,6 +118,41 @@ enum WaterQuality: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Smoke Shader Quality
+//
+// Same idea as WaterQuality/TunnelQuality above: bundles the render-cost
+// levers for the Smoke (colormap-warp fBM) effect into named tiers so
+// Settings offers one picker instead of a raw resolution slider. See
+// SmokeShaderView / ColormapWarp.metal for how each value is used.
+
+enum SmokeQuality: String, CaseIterable, Identifiable {
+    case low     = "Low"
+    case balanced = "Balanced"
+    case high    = "High"
+
+    var id: String { rawValue }
+
+    /// Fraction of the real screen resolution the shader renders at.
+    /// The single biggest cost lever — cost scales with pixel count.
+    var resolutionScale: CGFloat {
+        switch self {
+        case .low:      return 0.35
+        case .balanced: return 0.55
+        case .high:     return 0.8
+        }
+    }
+
+    /// Seconds between frame updates — the warp field drifts slowly, so it
+    /// doesn't need 60fps even at the higher tiers.
+    var frameInterval: Double {
+        switch self {
+        case .low:      return 1.0 / 15.0
+        case .balanced: return 1.0 / 24.0
+        case .high:     return 1.0 / 30.0
+        }
+    }
+}
+
 // MARK: - Theme Preset
 
 struct ThemePreset {
@@ -146,11 +181,12 @@ struct ThemePreset {
     var tunnelIntensity: Double
     var tunnelQuality: TunnelQuality
     var tunnelGrainStrength: Double
-    // Smoke (colormap-warp effect used behind SpectrumView)
+    // Smoke (colormap-warp effect)
     var useSmokeShader: Bool
     var smokeSpeed: Double
     var smokeIntensity: Double
     var smokeGrayscale: Double
+    var smokeQuality: SmokeQuality
 
     /// Convenience init that back-fills fog/tunnel/smoke defaults so every
     /// existing ThemePreset call site compiles without change.
@@ -173,7 +209,8 @@ struct ThemePreset {
         useSmokeShader: Bool = false,
         smokeSpeed: Double = 1.0,
         smokeIntensity: Double = 1.0,
-        smokeGrayscale: Double = 0.0
+        smokeGrayscale: Double = 0.0,
+        smokeQuality: SmokeQuality = .balanced
     ) {
         self.background     = background
         self.text           = text
@@ -201,6 +238,7 @@ struct ThemePreset {
         self.smokeSpeed      = smokeSpeed
         self.smokeIntensity  = smokeIntensity
         self.smokeGrayscale  = smokeGrayscale
+        self.smokeQuality    = smokeQuality
     }
 
     static let empty = ThemePreset(
@@ -841,6 +879,7 @@ private enum ThemeKey {
     static let smokeSpeed         = "theme.smokeSpeed"
     static let smokeIntensity     = "theme.smokeIntensity"
     static let smokeGrayscale     = "theme.smokeGrayscale"
+    static let smokeQuality       = "theme.smokeQuality"
     // Appearance
     static let appearanceMode     = "theme.appearanceMode"
     static let selectedDarkTheme  = "theme.selectedDarkTheme"
@@ -964,6 +1003,9 @@ final class ThemeManager: ObservableObject {
     @Published var smokeGrayscale: Double {
         didSet { UserDefaults.standard.set(smokeGrayscale, forKey: ThemeKey.smokeGrayscale) }
     }
+    @Published var smokeQuality: SmokeQuality {
+        didSet { UserDefaults.standard.set(smokeQuality.rawValue, forKey: ThemeKey.smokeQuality) }
+    }
 
     // ── Appearance / selected themes ─────────────────────────────────────────
 
@@ -1021,6 +1063,11 @@ final class ThemeManager: ObservableObject {
         smokeSpeed      = ud.object(forKey: ThemeKey.smokeSpeed)     as? Double ?? nordPreset.smokeSpeed
         smokeIntensity  = ud.object(forKey: ThemeKey.smokeIntensity) as? Double ?? nordPreset.smokeIntensity
         smokeGrayscale  = ud.object(forKey: ThemeKey.smokeGrayscale) as? Double ?? nordPreset.smokeGrayscale
+        if let raw = ud.string(forKey: ThemeKey.smokeQuality), let q = SmokeQuality(rawValue: raw) {
+            smokeQuality = q
+        } else {
+            smokeQuality = nordPreset.smokeQuality
+        }
 
         if let raw = ud.string(forKey: ThemeKey.appearanceMode),
            let mode = AppearanceMode(rawValue: raw) {
@@ -1081,6 +1128,7 @@ final class ThemeManager: ObservableObject {
             smokeSpeed      = p.smokeSpeed
             smokeIntensity  = p.smokeIntensity
             smokeGrayscale  = p.smokeGrayscale
+            smokeQuality    = p.smokeQuality
         }
         if AppTheme.darkThemes.contains(appTheme) {
             selectedDarkTheme  = appTheme
@@ -1155,7 +1203,7 @@ struct SettingsView: View {
             }
 
             // Badge row showing active effects
-            if theme.useWaterShader || theme.useFogShader {
+            if theme.useWaterShader || theme.useFogShader || theme.useTunnelShader || theme.useSmokeShader {
                 HStack(spacing: 8) {
                     if theme.useWaterShader {
                         Label("Water", systemImage: "drop.fill")
@@ -1184,6 +1232,15 @@ struct SettingsView: View {
                             .background(theme.tunnelColor.opacity(0.15))
                             .clipShape(Capsule())
                     }
+                    if theme.useSmokeShader {
+                        Label("Smoke", systemImage: "smoke.fill")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(theme.textColor.opacity(0.7))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(theme.textColor.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
                 }
                 .transition(.opacity.combined(with: .scale))
             }
@@ -1201,6 +1258,7 @@ struct SettingsView: View {
         .animation(.easeInOut(duration: 0.2), value: theme.useWaterShader)
         .animation(.easeInOut(duration: 0.2), value: theme.useFogShader)
         .animation(.easeInOut(duration: 0.2), value: theme.useTunnelShader)
+        .animation(.easeInOut(duration: 0.2), value: theme.useSmokeShader)
     }
 
     private func previewSwatch(_ label: String, _ color: Color) -> some View {
@@ -1463,10 +1521,8 @@ struct SettingsView: View {
 
     // MARK: - Smoke Shader Section
     //
-    // Colormap-warp fBM effect (see ColormapWarp.metal) rendered behind the
-    // SpectrumView audio visualizer, not as an AppBackground layer — so it
-    // doesn't get a badge in themePreview like Water/Fog/Tunnel, which are
-    // all full-screen backdrops.
+    // Colormap-warp fBM effect (see ColormapWarp.metal), a full-screen
+    // AppBackground layer alongside Water/Fog/Tunnel — see SmokeShaderView.
 
     private var smokeShaderSection: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1475,7 +1531,7 @@ struct SettingsView: View {
                     Text("Smoke Effect")
                         .font(.headline)
                         .foregroundStyle(theme.textColor)
-                    Text("Colormap-warp fBM behind the spectrum view")
+                    Text("Colormap-warp fBM background")
                         .font(.caption)
                         .foregroundStyle(theme.textColor.opacity(0.5))
                 }
@@ -1486,12 +1542,28 @@ struct SettingsView: View {
             }
 
             if theme.useSmokeShader {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Quality")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.textColor.opacity(0.7))
+                    Picker("Quality", selection: $theme.smokeQuality) {
+                        ForEach(SmokeQuality.allCases) { q in
+                            Text(q.rawValue).tag(q)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
                 VStack(spacing: 14) {
                     sliderRow(label: "Speed",     value: $theme.smokeSpeed,     range: 0.1...3.0, format: "%.1fx")
                     sliderRow(label: "Intensity", value: $theme.smokeIntensity, range: 0.0...1.0, format: "%.1f")
                     sliderRow(label: "Grayscale", value: $theme.smokeGrayscale, range: 0.0...1.0, format: "%.1f")
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
+
+                Text("Lower quality renders at a smaller resolution before upscaling — much easier on the GPU and battery. \"Low\" automatically applies when Low Power Mode is on.")
+                    .font(.caption2)
+                    .foregroundStyle(theme.textColor.opacity(0.4))
             }
         }
         .padding()
