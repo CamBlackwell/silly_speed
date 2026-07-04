@@ -45,7 +45,6 @@ using namespace metal;
 // Tunables that stay fixed regardless of quality tier.
 // ---------------------------------------------------------------------------
 constant float kDragMult      = 0.38;
-constant float kWaterDepth    = 1.0;
 constant float kCameraHeight  = 1.5;
 constant float kTau           = 6.28318530718;
 
@@ -195,6 +194,12 @@ inline float3 acesTonemap(float3 color) {
 //       .float(normalIterations)
 //   )
 //
+// `intensity` controls wave amplitude/depth, not color — low values (near
+// the settings slider's 0.1 floor) read as nearly flat water, high values
+// (up to the slider's 2.0 ceiling) produce tall, dramatic waves. Color
+// tinting from `tint` (theme.waterColor) is applied at a fixed blend
+// regardless of intensity — see kTintBlend below.
+//
 // Quality knobs come in as floats (SwiftUI's shader uniform system doesn't
 // pass ints) and are truncated to int locally.
 // ---------------------------------------------------------------------------
@@ -213,6 +218,13 @@ half4 waterEffect(float2 position,
     int raymarchIterations = max(2, int(raymarchIterationsF));
     int normalIterations   = max(2, int(normalIterationsF));
 
+    // `intensity` now controls wave amplitude/depth rather than color tint
+    // strength (see below) — clamped away from 0 since it's used as a
+    // division denominator further down (waterHitPos.y + waveDepth) / waveDepth.
+    // Matches the settings slider's 0.1...2.0 range: 0.1 reads as nearly
+    // flat water, 2.0 as tall, dramatic waves.
+    float waveDepth = max(0.05, intensity);
+
     // No FF time offset here (that existed to precision-harden Shadertoy's
     // huge accumulated iTime on a page left open for hours). This shader's
     // `time` starts at 0 each app launch, and the mod-wrap below still
@@ -229,7 +241,7 @@ half4 waterEffect(float2 position,
         outColor = acesTonemap(C * 2.0);
     } else {
         float3 waterPlaneHigh = float3(0.0, 0.0, 0.0);
-        float3 waterPlaneLow  = float3(0.0, -kWaterDepth, 0.0);
+        float3 waterPlaneLow  = float3(0.0, -waveDepth, 0.0);
         float3 origin = float3(0.0, kCameraHeight, 1.0);
 
         float highPlaneHit = intersectPlane(origin, ray, waterPlaneHigh, float3(0.0, 1.0, 0.0));
@@ -237,11 +249,11 @@ half4 waterEffect(float2 position,
         float3 highHitPos = origin + ray * highPlaneHit;
         float3 lowHitPos  = origin + ray * lowPlaneHit;
 
-        float dist = raymarchwater(origin, highHitPos, lowHitPos, kWaterDepth,
+        float dist = raymarchwater(origin, highHitPos, lowHitPos, waveDepth,
                                     raymarchSteps, raymarchIterations, nTime, camDriftX);
         float3 waterHitPos = origin + ray * dist;
 
-        float3 N = waterNormal(waterHitPos.xz, 0.01, kWaterDepth, normalIterations, nTime, camDriftX);
+        float3 N = waterNormal(waterHitPos.xz, 0.01, waveDepth, normalIterations, nTime, camDriftX);
         N = mix(N, float3(0.0, 1.0, 0.0), 0.8 * min(1.0, sqrt(dist * 0.01) * 1.1));
 
         float fresnel = 0.04 + (1.0 - 0.04) * pow(1.0 - max(0.0, dot(-N, ray)), 5.0);
@@ -251,17 +263,17 @@ half4 waterEffect(float2 position,
 
         float3 reflection = getAtmosphere(R, nTime) + getSun(R, nTime);
         float3 scattering = float3(0.0293, 0.0698, 0.1717) * 0.1
-                           * (0.2 + (waterHitPos.y + kWaterDepth) / kWaterDepth);
+                           * (0.2 + (waterHitPos.y + waveDepth) / waveDepth);
 
         float3 C = fresnel * reflection + scattering;
         outColor = acesTonemap(C * 2.0);
     }
 
-    // theme.waterColor tints the result; intensity blends between the raw
-    // rendered water and that tint so the effect can be pushed toward the
-    // app's theme color without losing the shading detail underneath.
+    // theme.waterColor tints the result at a fixed blend — no longer tied
+    // to `intensity`, which now drives wave amplitude above instead.
+    const half kTintBlend = 0.35;
     half3 shaded = half3(outColor);
-    half3 tinted = mix(shaded, shaded * half3(tint.rgb) * 2.0, half(clamp(intensity, 0.0, 1.0)));
+    half3 tinted = mix(shaded, shaded * half3(tint.rgb) * 2.0, kTintBlend);
 
     return half4(tinted, 1.0);
 }

@@ -140,7 +140,7 @@ static half3 tunnelPalette(half t, half3 a, half3 b, half3 c, half3 d) {
         //col *= tunnelPalette(rf.y, e, e, e, 0.35h * tint);
     }
 
-    //col = pow(col, half3(0.4545h)); // gamma correction
+    col = pow(col, half3(0.4545h)); // gamma correction
     col = clamp(col * half(intensity), 0.0h, 1.0h);
 
     return half4(col, color.a);
