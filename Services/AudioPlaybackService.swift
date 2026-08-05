@@ -44,6 +44,9 @@ final class AudioPlaybackService {
         }
 
         engine.load(audioFile: audioFile)
+        engine.onPlaybackFinished = { [weak self] in
+            self?.manager.skipNextSong()
+        }
         manager.attachAnalyzerSafely()
         engine.setTempo(manager.tempo)
         engine.setPitch(manager.pitch)

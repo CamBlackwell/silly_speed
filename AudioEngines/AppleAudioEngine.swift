@@ -16,6 +16,7 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
     private var isUserStopped = false
     private let buffersAhead = 5
     private let bufferDuration: TimeInterval = 0.25
+    var onPlaybackFinished: (() -> Void)?
 
     #if DEBUG
     private var debug_starveCount: Int = 0
@@ -150,6 +151,9 @@ class AppleAudioEngine: NSObject, AudioEngineProtocol {
                     #endif
                     if atEnd && self.scheduledBuffersCount == 0 {
                         self.isFileFinished = true
+                        DispatchQueue.main.async {
+                            self.onPlaybackFinished?()
+                        }
                     } else {
                         self.scheduleBuffersIfNeeded()
                     }

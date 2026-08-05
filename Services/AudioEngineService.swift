@@ -54,6 +54,9 @@ final class AudioEngineService {
 
         if let audioFile = currentAudioFile {
             manager.currentEngine?.load(audioFile: audioFile)
+            manager.currentEngine?.onPlaybackFinished = { [weak self] in
+                self?.manager.skipNextSong()
+            }
             manager.currentEngine?.setTempo(manager.tempo)
             manager.currentEngine?.setPitch(manager.pitch)
 

@@ -14,10 +14,11 @@ public struct EngineDebugMetrics {
     }
 }
 
-protocol AudioEngineProtocol {
+protocol AudioEngineProtocol: AnyObject {
     var isPlaying: Bool { get }
     var currentTime: TimeInterval { get }
     var duration: TimeInterval { get }
+    var onPlaybackFinished: (() -> Void)? { get set }
    
     func getAudioEngine() -> AVAudioEngine?
     func load(audioFile: AudioFile)
